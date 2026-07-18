@@ -1,24 +1,24 @@
 const router = require("express").Router();
 
+
 const upload = require("../middleware/upload");
+
 
 const {
 
-    authenticate,
-
-    isAdmin
+    authenticate
 
 } = require("../middleware/authMiddleware");
 
-const controller = require("../controllers/adminUserController");
 
+const controller = require("../controllers/userController");
+
+
+
+// User registration
 router.post(
 
-    "/create",
-
-    authenticate,
-
-    isAdmin,
+    "/register",
 
     upload.single("profile_image"),
 
@@ -26,42 +26,33 @@ router.post(
 
 );
 
+
+
+// User profile
 router.get(
 
-    "/",
+    "/profile",
 
     authenticate,
 
-    isAdmin,
-
-    controller.getUsers
+    controller.getProfile
 
 );
 
+
+
+// User update own profile
 router.put(
 
-    "/:id",
+    "/profile",
 
     authenticate,
-
-    isAdmin,
 
     upload.single("profile_image"),
 
-    controller.updateUser
+    controller.updateProfile
 
 );
 
-router.delete(
-
-    "/:id",
-
-    authenticate,
-
-    isAdmin,
-
-    controller.deleteUser
-
-);
 
 module.exports = router;

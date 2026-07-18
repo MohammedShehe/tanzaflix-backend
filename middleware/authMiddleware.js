@@ -1,40 +1,72 @@
-const jwt=require("jsonwebtoken");
+const jwt = require("jsonwebtoken");
 
-exports.authenticate=(req,res,next)=>{
 
-    const auth=req.headers.authorization;
+exports.authenticate = (req,res,next)=>{
 
-    if(!auth){
+    const auth = req.headers.authorization;
+
+
+    if(!auth || !auth.startsWith("Bearer ")){
 
         return res.status(401).json({
+
             message:"Unauthorized"
+
         });
 
     }
+
 
     try{
 
-        const token=auth.split(" ")[1];
+        const token = auth.split(" ")[1];
 
-        req.user=jwt.verify(token,process.env.JWT_SECRET);
+
+        req.user = jwt.verify(
+
+            token,
+
+            process.env.JWT_SECRET
+
+        );
+
 
         next();
 
+
     }
 
-    catch{
+    catch(err){
 
-        res.status(401).json({
+        return res.status(401).json({
+
             message:"Invalid token"
+
         });
 
     }
 
-}
+};
 
-exports.isAdmin=(req,res,next)=>{
 
-    if(req.user.role!=="admin"){
+
+
+exports.isAdmin = (req,res,next)=>{
+
+
+    if(!req.user){
+
+        return res.status(401).json({
+
+            message:"Unauthorized"
+
+        });
+
+    }
+
+
+
+    if(req.user.role !== "admin"){
 
         return res.status(403).json({
 
@@ -44,6 +76,8 @@ exports.isAdmin=(req,res,next)=>{
 
     }
 
+
     next();
 
-}
+
+};

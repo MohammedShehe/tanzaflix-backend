@@ -8,12 +8,14 @@
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "cloudinary": "^1.41.3",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^4.22.2",
     "helmet": "^7.0.0",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.2.0",
+    "multer-storage-cloudinary": "^4.0.0",
     "mysql2": "^3.23.0",
     "nodemailer": "^9.0.3"
   },

@@ -1,29 +1,26 @@
-const db=require("../config/db");
-const bcrypt=require("bcrypt");
-const fs = require("fs");
-const path = require("path");
+const db = require("../config/db");
+const bcrypt = require("bcrypt");
+const cloudinary = require("../config/cloudinary");
 
-exports.createUser=async(req,res)=>{
+
+exports.createUser = async(req,res)=>{
 
 try{
 
-const{
+
+const {
 
 full_name,
-
 phone,
-
 country,
-
 region,
-
 email,
-
 password,
-
 confirmPassword
 
 }=req.body;
+
+
 
 if(!full_name || !phone || !country || !email || !password || !confirmPassword){
 
@@ -35,7 +32,9 @@ message:"Please fill all required fields."
 
 }
 
-if(password!==confirmPassword){
+
+
+if(password !== confirmPassword){
 
 return res.status(400).json({
 
@@ -45,9 +44,9 @@ message:"Passwords do not match."
 
 }
 
-if(country==="Tanzania"){
 
-if(!region){
+
+if(country==="Tanzania" && !region){
 
 return res.status(400).json({
 
@@ -57,7 +56,8 @@ message:"Region is required."
 
 }
 
-}
+
+
 
 const [exists]=await db.query(
 
@@ -66,6 +66,8 @@ const [exists]=await db.query(
 [email]
 
 );
+
+
 
 if(exists.length){
 
@@ -77,23 +79,45 @@ message:"Email already exists."
 
 }
 
+
+
 const hashedPassword=await bcrypt.hash(password,10);
+
+
 
 let image=null;
 
+let imagePublicId=null;
+
+
+
 if(req.file){
 
-image=req.file.filename;
+image=req.file.path;
+
+imagePublicId=req.file.filename;
 
 }
+
+
 
 await db.query(
 
 `INSERT INTO users
 
-(full_name,phone,country,region,email,password,profile_image,role)
+(
+full_name,
+phone,
+country,
+region,
+email,
+password,
+profile_image,
+profile_public_id,
+role
+)
 
-VALUES(?,?,?,?,?,?,?,?)`,
+VALUES(?,?,?,?,?,?,?,?,?)`,
 
 [
 
@@ -111,11 +135,15 @@ hashedPassword,
 
 image,
 
+imagePublicId,
+
 "user"
 
 ]
 
 );
+
+
 
 res.status(201).json({
 
@@ -125,7 +153,9 @@ message:"User registered successfully."
 
 });
 
+
 }
+
 
 catch(err){
 
@@ -137,303 +167,385 @@ message:err.message
 
 }
 
+
+};
+
+
+
+
+
+
+
+exports.getUsers = async(req,res)=>{
+
+try{
+
+
+const [users]=await db.query(
+
+`
+SELECT
+
+id,
+full_name,
+phone,
+country,
+region,
+email,
+role,
+profile_image,
+created_at
+
+FROM users
+
+WHERE role='user'
+
+ORDER BY id DESC
+
+`
+
+);
+
+
+
+res.json({
+
+success:true,
+
+total:users.length,
+
+users
+
+});
+
+
 }
 
-exports.getUsers = async (req, res) => {
 
-    try {
+catch(err){
 
-        const [users] = await db.query(
+res.status(500).json({
 
-            `SELECT
+success:false,
 
-                id,
-                full_name,
-                phone,
-                country,
-                region,
-                email,
-                role,
-                profile_image,
-                created_at
+message:err.message
 
-            FROM users
+});
 
-            WHERE role='user'
+}
 
-            ORDER BY id DESC`
-
-        );
-
-        const formattedUsers = users.map(user => ({
-
-            ...user,
-
-            profile_image: user.profile_image
-                ? `${req.protocol}://${req.get("host")}/uploads/profiles/${user.profile_image}`
-                : null
-
-        }));
-
-        res.json({
-
-            success: true,
-
-            total: formattedUsers.length,
-
-            users: formattedUsers
-
-        });
-
-    }
-
-    catch (err) {
-
-        res.status(500).json({
-
-            success: false,
-
-            message: err.message
-
-        });
-
-    }
 
 };
 
-exports.updateUser = async (req, res) => {
 
-    try {
 
-        const { id } = req.params;
 
-        const {
 
-            full_name,
-            phone,
-            country,
-            region,
-            email
 
-        } = req.body;
 
-        const [rows] = await db.query(
 
-            "SELECT * FROM users WHERE id=? AND role='user'",
 
-            [id]
+exports.updateUser = async(req,res)=>{
 
-        );
 
-        if (!rows.length) {
+try{
 
-            return res.status(404).json({
 
-                success: false,
+const {id}=req.params;
 
-                message: "User not found."
 
-            });
 
-        }
+const {
 
-        const user = rows[0];
+full_name,
+phone,
+country,
+region,
+email
 
-        const [existingEmail] = await db.query(
+}=req.body;
 
-            "SELECT id FROM users WHERE email=? AND id<>?",
 
-            [email, id]
 
-        );
 
-        if (existingEmail.length) {
+const [rows]=await db.query(
 
-            return res.status(400).json({
+"SELECT * FROM users WHERE id=? AND role='user'",
 
-                success: false,
+[id]
 
-                message: "Email already exists."
+);
 
-            });
 
-        }
 
-        let image = user.profile_image;
+if(!rows.length){
 
-        if (req.file) {
+return res.status(404).json({
 
-            if (image) {
+success:false,
 
-                const oldImage = path.join(
+message:"User not found."
 
-                    __dirname,
+});
 
-                    "..",
+}
 
-                    "uploads",
 
-                    "profiles",
 
-                    image
+const user=rows[0];
 
-                );
 
-                if (fs.existsSync(oldImage)) {
 
-                    fs.unlinkSync(oldImage);
 
-                }
+const [existingEmail]=await db.query(
 
-            }
+"SELECT id FROM users WHERE email=? AND id<>?",
 
-            image = req.file.filename;
+[email,id]
 
-        }
+);
 
-        await db.query(
 
-            `UPDATE users SET
 
-            full_name=?,
+if(existingEmail.length){
 
-            phone=?,
+return res.status(400).json({
 
-            country=?,
+success:false,
 
-            region=?,
+message:"Email already exists."
 
-            email=?,
+});
 
-            profile_image=?
+}
 
-            WHERE id=?`,
 
-            [
 
-                full_name,
 
-                phone,
+let image=user.profile_image;
 
-                country,
+let imagePublicId=user.profile_public_id;
 
-                country === "Tanzania" ? region : null,
 
-                email,
 
-                image,
 
-                id
+if(req.file){
 
-            ]
 
-        );
 
-        res.json({
+if(imagePublicId){
 
-            success: true,
 
-            message: "User updated successfully."
+await cloudinary.uploader.destroy(
 
-        });
+imagePublicId,
 
-    }
+{
 
-    catch (err) {
+resource_type:"image"
 
-        res.status(500).json({
+}
 
-            success: false,
+);
 
-            message: err.message
 
-        });
+}
 
-    }
+
+
+image=req.file.path;
+
+imagePublicId=req.file.filename;
+
+
+}
+
+
+
+
+await db.query(
+
+`
+UPDATE users SET
+
+full_name=?,
+
+phone=?,
+
+country=?,
+
+region=?,
+
+email=?,
+
+profile_image=?,
+
+profile_public_id=?
+
+WHERE id=?
+
+`,
+
+[
+
+
+full_name,
+
+phone,
+
+country,
+
+country==="Tanzania"?region:null,
+
+email,
+
+image,
+
+imagePublicId,
+
+id
+
+
+]
+
+);
+
+
+
+
+res.json({
+
+success:true,
+
+message:"User updated successfully."
+
+});
+
+
+}
+
+
+catch(err){
+
+
+res.status(500).json({
+
+success:false,
+
+message:err.message
+
+});
+
+
+}
+
 
 };
 
-exports.deleteUser = async (req, res) => {
 
-    try {
 
-        const { id } = req.params;
 
-        const [rows] = await db.query(
 
-            "SELECT * FROM users WHERE id=? AND role='user'",
 
-            [id]
 
-        );
 
-        if (!rows.length) {
 
-            return res.status(404).json({
+exports.deleteUser = async(req,res)=>{
 
-                success: false,
 
-                message: "User not found."
+try{
 
-            });
 
-        }
+const {id}=req.params;
 
-        const user = rows[0];
 
-        if (user.profile_image) {
 
-            const imagePath = path.join(
+const [rows]=await db.query(
 
-                __dirname,
+"SELECT * FROM users WHERE id=? AND role='user'",
 
-                "..",
+[id]
 
-                "uploads",
+);
 
-                "profiles",
 
-                user.profile_image
 
-            );
+if(!rows.length){
 
-            if (fs.existsSync(imagePath)) {
+return res.status(404).json({
 
-                fs.unlinkSync(imagePath);
+success:false,
 
-            }
+message:"User not found."
 
-        }
+});
 
-        await db.query(
+}
 
-            "DELETE FROM users WHERE id=?",
 
-            [id]
 
-        );
+const user=rows[0];
 
-        res.json({
 
-            success: true,
 
-            message: "User deleted successfully."
 
-        });
+if(user.profile_public_id){
 
-    }
 
-    catch (err) {
+await cloudinary.uploader.destroy(
 
-        res.status(500).json({
+user.profile_public_id,
 
-            success: false,
+{
 
-            message: err.message
+resource_type:"image"
 
-        });
+}
 
-    }
+);
+
+
+}
+
+
+
+
+await db.query(
+
+"DELETE FROM users WHERE id=?",
+
+[id]
+
+);
+
+
+
+
+res.json({
+
+success:true,
+
+message:"User deleted successfully."
+
+});
+
+
+}
+
+
+catch(err){
+
+
+res.status(500).json({
+
+success:false,
+
+message:err.message
+
+});
+
+
+}
+
 
 };
-

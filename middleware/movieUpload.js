@@ -1,102 +1,211 @@
 const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+const cloudinary = require("../config/cloudinary");
 
-// Create folders if they don't exist
-const videoDir = "uploads/movies/videos";
-const posterDir = "uploads/posters";
 
-if (!fs.existsSync(videoDir)) {
-    fs.mkdirSync(videoDir, { recursive: true });
-}
+// Video storage
 
-if (!fs.existsSync(posterDir)) {
-    fs.mkdirSync(posterDir, { recursive: true });
-}
+const videoStorage = new CloudinaryStorage({
 
-const storage = multer.diskStorage({
+    cloudinary,
 
-    destination(req, file, cb) {
+    params: {
 
-        if (file.fieldname === "video") {
+        folder: "movies/videos",
 
-            cb(null, videoDir);
+        resource_type: "video",
 
-        } else if (file.fieldname === "poster") {
+        allowed_formats: [
 
-            cb(null, posterDir);
+            "mp4",
+            "mkv",
+            "mov",
+            "webm",
+            "avi"
 
-        }
-
-    },
-
-    filename(req, file, cb) {
-
-        const uniqueName =
-            Date.now() +
-            "-" +
-            Math.round(Math.random() * 1000000) +
-            path.extname(file.originalname);
-
-        cb(null, uniqueName);
+        ]
 
     }
 
 });
 
-function fileFilter(req, file, cb) {
 
-    if (file.fieldname === "poster") {
 
-        const allowed = [
+// Poster storage
+
+const posterStorage = new CloudinaryStorage({
+
+    cloudinary,
+
+    params: {
+
+        folder: "movies/posters",
+
+        resource_type: "image",
+
+        allowed_formats: [
+
+            "jpg",
+            "jpeg",
+            "png",
+            "webp"
+
+        ]
+
+    }
+
+});
+
+
+
+// Custom multer storage selector
+
+const storage = {
+
+    _handleFile(req, file, cb) {
+
+
+        let selectedStorage;
+
+
+        if(file.fieldname === "video"){
+
+            selectedStorage = videoStorage;
+
+        }
+
+        else if(file.fieldname === "poster"){
+
+            selectedStorage = posterStorage;
+
+        }
+
+        else {
+
+            return cb(
+                new Error("Invalid upload field")
+            );
+
+        }
+
+
+        selectedStorage._handleFile(req,file,cb);
+
+    },
+
+
+    _removeFile(req,file,cb){
+
+
+        let selectedStorage;
+
+
+        if(file.fieldname === "video"){
+
+            selectedStorage = videoStorage;
+
+        }
+
+        else if(file.fieldname === "poster"){
+
+            selectedStorage = posterStorage;
+
+        }
+
+
+        if(selectedStorage){
+
+            selectedStorage._removeFile(req,file,cb);
+
+        }
+
+        else{
+
+            cb(null);
+
+        }
+
+
+    }
+
+};
+
+
+
+
+// File validation
+
+const fileFilter = (req,file,cb)=>{
+
+
+    if(file.fieldname === "poster"){
+
+
+        const allowedImages=[
 
             "image/jpeg",
-
             "image/png",
-
             "image/jpg",
-
             "image/webp"
 
         ];
 
-        if (allowed.includes(file.mimetype)) {
 
-            return cb(null, true);
+        if(allowedImages.includes(file.mimetype)){
+
+            return cb(null,true);
 
         }
 
-        return cb(new Error("Poster must be an image"));
+
+        return cb(
+            new Error("Only image files are allowed for posters")
+        );
+
 
     }
 
-    if (file.fieldname === "video") {
 
-        const allowed = [
+
+    if(file.fieldname === "video"){
+
+
+        const allowedVideos=[
 
             "video/mp4",
-
             "video/x-matroska",
-
             "video/quicktime",
-
             "video/webm",
-
             "video/x-msvideo"
 
         ];
 
-        if (allowed.includes(file.mimetype)) {
 
-            return cb(null, true);
+        if(allowedVideos.includes(file.mimetype)){
+
+            return cb(null,true);
 
         }
 
-        return cb(new Error("Unsupported video format"));
+
+        return cb(
+            new Error("Unsupported video format")
+        );
+
 
     }
 
-}
+
+    cb(
+        new Error("Invalid file field")
+    );
+
+
+};
+
+
+
+
 
 module.exports = multer({
 
@@ -104,9 +213,9 @@ module.exports = multer({
 
     fileFilter,
 
-    limits: {
+    limits:{
 
-        fileSize: 1024 * 1024 * 1024 * 2 // 2GB
+        fileSize:1024 * 1024 * 1024 * 2
 
     }
 

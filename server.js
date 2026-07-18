@@ -10,9 +10,11 @@ app.use(cors());
 app.use(express.json());
 
 app.use("/api/auth",require("./routes/authRoutes"));
-app.use("/uploads",express.static("uploads"));
-app.use("/api/users",require("./routes/userRoutes"));
+app.use("/api/users",require("./routes/adminUserRoutes"));
 app.use("/api/movies", require("./routes/movieRoutes"));
+app.use("/api/users", require("./routes/userRoutes"));
+app.use("/api/user/movies", require("./routes/userMovieRoutes"));
+
 
 
 app.listen(process.env.PORT,()=>{
