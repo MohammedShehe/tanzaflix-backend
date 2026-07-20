@@ -16,6 +16,38 @@
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
+-- Table structure for table `episodes`
+--
+
+DROP TABLE IF EXISTS `episodes`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `episodes` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `season_id` int(11) NOT NULL,
+  `episode_number` int(11) NOT NULL,
+  `episode_title` varchar(255) DEFAULT NULL,
+  `video_url` varchar(255) NOT NULL,
+  `video_public_id` varchar(255) NOT NULL,
+  `duration` varchar(50) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_episode` (`season_id`,`episode_number`),
+  CONSTRAINT `episodes_ibfk_1` FOREIGN KEY (`season_id`) REFERENCES `seasons` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `episodes`
+--
+
+LOCK TABLES `episodes` WRITE;
+/*!40000 ALTER TABLE `episodes` DISABLE KEYS */;
+INSERT INTO `episodes` VALUES (1,6,1,'Pilot','https://res.cloudinary.com/dlokcqf1h/video/upload/v1784586616/movies/episodes/p0mb9nivrwokmg4dbxk7.mp4','movies/episodes/p0mb9nivrwokmg4dbxk7','58m','2026-07-20 22:30:24'),(2,6,2,'Cat\'s in the Bag...','https://res.cloudinary.com/dlokcqf1h/video/upload/v1784586619/movies/episodes/moo9io45kb9hepq3isqu.mp4','movies/episodes/moo9io45kb9hepq3isqu','48m','2026-07-20 22:30:24'),(3,6,3,'...And the Bag\'s in the River','https://res.cloudinary.com/dlokcqf1h/video/upload/v1784586620/movies/episodes/tpyjkz4d7es3lv6cgwel.mp4','movies/episodes/tpyjkz4d7es3lv6cgwel','48m','2026-07-20 22:30:24'),(4,7,1,'Seven Thirty-Seven','https://res.cloudinary.com/dlokcqf1h/video/upload/v1784586620/movies/episodes/x1eidnxw7bhjmsq4syo4.mp4','movies/episodes/x1eidnxw7bhjmsq4syo4','47m','2026-07-20 22:30:24'),(5,7,2,'Grilled','https://res.cloudinary.com/dlokcqf1h/video/upload/v1784586624/movies/episodes/gejwm4log8mdzq7cttiw.mp4','movies/episodes/gejwm4log8mdzq7cttiw','48m','2026-07-20 22:30:24'),(6,7,3,'Bit by a Dead Bee','https://res.cloudinary.com/dlokcqf1h/video/upload/v1784586624/movies/episodes/e3wqkjkrplv0orrstlrj.mp4','movies/episodes/e3wqkjkrplv0orrstlrj','47m','2026-07-20 22:30:24'),(7,8,1,'Pilot','https://res.cloudinary.com/dlokcqf1h/video/upload/v1784586985/movies/episodes/c76rwv63hilwv8dwzzix.mp4','movies/episodes/c76rwv63hilwv8dwzzix','58m','2026-07-20 22:36:38'),(8,8,2,'Cat\'s in the Bag...','https://res.cloudinary.com/dlokcqf1h/video/upload/v1784586985/movies/episodes/mvhih1wel1tvvovmv2gw.mp4','movies/episodes/mvhih1wel1tvvovmv2gw','48m','2026-07-20 22:36:38'),(9,8,3,'...And the Bag\'s in the River','https://res.cloudinary.com/dlokcqf1h/video/upload/v1784586991/movies/episodes/olk1j70rvhbkwkdqitak.mp4','movies/episodes/olk1j70rvhbkwkdqitak','48m','2026-07-20 22:36:38'),(10,9,1,'Seven Thirty-Seven','https://res.cloudinary.com/dlokcqf1h/video/upload/v1784586992/movies/episodes/itirosd2izq8lbnz50ms.mp4','movies/episodes/itirosd2izq8lbnz50ms','47m','2026-07-20 22:36:38'),(11,9,2,'Grilled','https://res.cloudinary.com/dlokcqf1h/video/upload/v1784586995/movies/episodes/shtwwpiymbfbyyqqbkka.mp4','movies/episodes/shtwwpiymbfbyyqqbkka','48m','2026-07-20 22:36:38'),(12,9,3,'Bit by a Dead Bee','https://res.cloudinary.com/dlokcqf1h/video/upload/v1784586996/movies/episodes/ylco3ygnjsgkuxvhm40p.mp4','movies/episodes/ylco3ygnjsgkuxvhm40p','47m','2026-07-20 22:36:38');
+/*!40000 ALTER TABLE `episodes` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `movie_access`
 --
 
@@ -63,7 +95,7 @@ CREATE TABLE `movie_recommendations` (
   KEY `idx_recommended_movie_id` (`recommended_movie_id`),
   CONSTRAINT `movie_recommendations_ibfk_1` FOREIGN KEY (`movie_id`) REFERENCES `movies` (`id`) ON DELETE CASCADE,
   CONSTRAINT `movie_recommendations_ibfk_2` FOREIGN KEY (`recommended_movie_id`) REFERENCES `movies` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -72,6 +104,7 @@ CREATE TABLE `movie_recommendations` (
 
 LOCK TABLES `movie_recommendations` WRITE;
 /*!40000 ALTER TABLE `movie_recommendations` DISABLE KEYS */;
+INSERT INTO `movie_recommendations` VALUES (1,1,1),(7,7,1),(8,8,1);
 /*!40000 ALTER TABLE `movie_recommendations` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -85,7 +118,7 @@ DROP TABLE IF EXISTS `movies`;
 CREATE TABLE `movies` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `title` varchar(255) NOT NULL,
-  `movie_type` enum('Imetafsiriwa','Haijatafsiriwa') NOT NULL,
+  `movie_type` enum('single','series') NOT NULL DEFAULT 'single',
   `country` enum('Bongo Movie','Movie ya Kiarabu','Movie ya Kifilipino','Movie ya Kihindi','Movie ya Kitaliano','Movie ya Kikorea') NOT NULL,
   `language` varchar(100) NOT NULL,
   `category` enum('Action','Love Story','Drama','Mix') NOT NULL,
@@ -93,12 +126,13 @@ CREATE TABLE `movies` (
   `price` decimal(10,2) NOT NULL,
   `description` text DEFAULT NULL,
   `poster` varchar(255) DEFAULT NULL,
-  `video` varchar(255) NOT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `poster_public_id` varchar(255) DEFAULT NULL,
+  `video` varchar(255) DEFAULT NULL,
   `video_public_id` varchar(255) DEFAULT NULL,
+  `movie_time` varchar(50) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -107,7 +141,7 @@ CREATE TABLE `movies` (
 
 LOCK TABLES `movies` WRITE;
 /*!40000 ALTER TABLE `movies` DISABLE KEYS */;
-INSERT INTO `movies` VALUES (2,'Avengers','Imetafsiriwa','Movie ya Kikorea','Kiswahili','Action',2010,10000.00,'Movie ya Majaribio','https://res.cloudinary.com/dlokcqf1h/image/upload/v1784403948/movies/posters/ajyw4zcoxobcnwqzvmqd.png','https://res.cloudinary.com/dlokcqf1h/video/upload/v1784403951/movies/videos/vejondyqksusu7k9scbu.mp4','2026-07-18 19:45:50','movies/posters/ajyw4zcoxobcnwqzvmqd','movies/videos/vejondyqksusu7k9scbu');
+INSERT INTO `movies` VALUES (1,'The Dark Knight','single','Movie ya Kikorea','Kiswahili','Action',2022,15000.00,'When the menace known as the Joker wreaks havoc on Gotham','https://res.cloudinary.com/dlokcqf1h/image/upload/v1784585473/movies/posters/vdyzw9qk31xhmxnowb66.png','movies/posters/vdyzw9qk31xhmxnowb66','https://res.cloudinary.com/dlokcqf1h/video/upload/v1784585476/movies/videos/ds9hs4afjriuacgmlc2q.mp4','movies/videos/ds9hs4afjriuacgmlc2q','2h 32m','2026-07-20 22:11:17'),(7,'Breaking Bad','series','Movie ya Kikorea','Kiswahili','Drama',2008,2000.00,'A high school chemistry teacher turned methamphetamine manufacturer','https://res.cloudinary.com/dlokcqf1h/image/upload/v1784586613/movies/posters/sdze7ldohodrcgkjqeld.jpg','movies/posters/sdze7ldohodrcgkjqeld',NULL,NULL,NULL,'2026-07-20 22:30:24'),(8,'Movie La Kutisha','series','Bongo Movie','Kiswahili','Action',2026,2000.00,'Hii ni movie ya majaribio','https://res.cloudinary.com/dlokcqf1h/image/upload/v1784586979/movies/posters/rpcrxt8yie2llnwiejvj.jpg','movies/posters/rpcrxt8yie2llnwiejvj',NULL,NULL,NULL,'2026-07-20 22:36:38');
 /*!40000 ALTER TABLE `movies` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -216,6 +250,35 @@ INSERT INTO `plans` VALUES (1,'Daily',5000.00,'TZS',1,'Unlimited access for 1 da
 UNLOCK TABLES;
 
 --
+-- Table structure for table `seasons`
+--
+
+DROP TABLE IF EXISTS `seasons`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `seasons` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `movie_id` int(11) NOT NULL,
+  `season_number` int(11) NOT NULL,
+  `season_name` varchar(255) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_season` (`movie_id`,`season_number`),
+  CONSTRAINT `seasons_ibfk_1` FOREIGN KEY (`movie_id`) REFERENCES `movies` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `seasons`
+--
+
+LOCK TABLES `seasons` WRITE;
+/*!40000 ALTER TABLE `seasons` DISABLE KEYS */;
+INSERT INTO `seasons` VALUES (6,7,1,'Season 1 - The Beginning','2026-07-20 22:30:24'),(7,7,2,'Season 2 - The Rise','2026-07-20 22:30:24'),(8,8,1,'Season 1 - The Beginning','2026-07-20 22:36:38'),(9,8,2,'Season 2 - The Rise','2026-07-20 22:36:38');
+/*!40000 ALTER TABLE `seasons` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `subscriptions`
 --
 
@@ -295,4 +358,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-07-21  2:41:10
+-- Dump completed on 2026-07-21  4:09:49
