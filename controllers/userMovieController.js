@@ -1,5 +1,14 @@
+// controllers/userMovieController.js
 const db = require("../config/db");
 const { logMovieAccess } = require("../middleware/movieAccessMiddleware");
+
+// Helper function to determine if user watched enough
+const hasWatchedEnough = (watchedDuration, totalDuration) => {
+    // Minimum 30% of the movie OR at least 5 minutes (300 seconds)
+    if (!totalDuration || totalDuration === 0) return false;
+    const percentage = (watchedDuration / totalDuration) * 100;
+    return percentage >= 30 || watchedDuration >= 300;
+};
 
 exports.getMovies = async (req, res) => {
     try {
@@ -235,7 +244,7 @@ exports.getMovie = async (req, res) => {
             accessType = 'paid_single';
             accessMessage = "You have purchased this movie";
         } else if (isFirstTime) {
-            // Check if already used free trial on this movie
+            // Check if already used free trial on this movie (completed)
             const [trialUsed] = await db.query(
                 `SELECT id FROM movie_access_logs 
                  WHERE user_id = ? AND movie_id = ? 
@@ -349,20 +358,73 @@ exports.getMovie = async (req, res) => {
 exports.markEpisodeComplete = async (req, res) => {
     try {
         const userId = req.user.id;
-        const { movieId, episodeId, duration } = req.body;
+        const { movieId, episodeId, duration, totalDuration } = req.body;
 
-        await db.query(
-            `UPDATE movie_access_logs 
-             SET completed = TRUE, watched_duration = ?
+        // Validate required fields
+        if (!movieId || !episodeId) {
+            return res.status(400).json({
+                success: false,
+                message: "Movie ID and Episode ID are required"
+            });
+        }
+
+        // Check if this was a free trial access
+        const [accessLog] = await db.query(
+            `SELECT id, access_type, completed FROM movie_access_logs 
              WHERE user_id = ? AND movie_id = ? AND episode_id = ? 
              AND access_type = 'free_trial'
              ORDER BY id DESC LIMIT 1`,
-            [duration || 0, userId, movieId, episodeId]
+            [userId, movieId, episodeId]
         );
+
+        if (accessLog.length > 0 && accessLog[0].access_type === 'free_trial') {
+            // Only update if not already completed
+            if (!accessLog[0].completed) {
+                // Check if user watched enough
+                const watchedEnough = hasWatchedEnough(duration || 0, totalDuration || 0);
+                
+                if (watchedEnough) {
+                    // Mark user as having watched for the first time
+                    await db.query(
+                        `UPDATE users SET 
+                         has_watched_before = TRUE,
+                         first_watch_at = COALESCE(first_watch_at, NOW())
+                         WHERE id = ? AND has_watched_before = FALSE`,
+                        [userId]
+                    );
+                    
+                    // Mark the access log as completed
+                    await db.query(
+                        `UPDATE movie_access_logs 
+                         SET completed = TRUE, watched_duration = ?
+                         WHERE id = ?`,
+                        [duration || 0, accessLog[0].id]
+                    );
+                    
+                    console.log(`User ${userId} completed free trial for episode ${episodeId} of movie ${movieId}`);
+                } else {
+                    // Update watched duration but don't mark as completed
+                    await db.query(
+                        `UPDATE movie_access_logs 
+                         SET watched_duration = ?
+                         WHERE id = ?`,
+                        [duration || 0, accessLog[0].id]
+                    );
+                }
+            }
+        } else {
+            // Not a free trial, just log the progress
+            await db.query(
+                `INSERT INTO movie_access_logs 
+                 (user_id, movie_id, episode_id, access_type, completed, watched_duration) 
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                [userId, movieId, episodeId, 'watched', true, duration || 0]
+            );
+        }
 
         res.json({
             success: true,
-            message: "Episode marked as completed"
+            message: "Episode progress saved"
         });
 
     } catch (err) {
@@ -378,25 +440,118 @@ exports.markEpisodeComplete = async (req, res) => {
 exports.markMovieComplete = async (req, res) => {
     try {
         const userId = req.user.id;
-        const { movieId, duration } = req.body;
+        const { movieId, duration, totalDuration } = req.body;
 
-        await db.query(
-            `UPDATE movie_access_logs 
-             SET completed = TRUE, watched_duration = ?
+        // Validate required fields
+        if (!movieId) {
+            return res.status(400).json({
+                success: false,
+                message: "Movie ID is required"
+            });
+        }
+
+        // Check if this was a free trial access
+        const [accessLog] = await db.query(
+            `SELECT id, access_type, completed FROM movie_access_logs 
              WHERE user_id = ? AND movie_id = ? 
              AND episode_id IS NULL
              AND access_type = 'free_trial'
              ORDER BY id DESC LIMIT 1`,
-            [duration || 0, userId, movieId]
+            [userId, movieId]
         );
+
+        if (accessLog.length > 0 && accessLog[0].access_type === 'free_trial') {
+            // Only update if not already completed
+            if (!accessLog[0].completed) {
+                // Check if user watched enough
+                const watchedEnough = hasWatchedEnough(duration || 0, totalDuration || 0);
+                
+                if (watchedEnough) {
+                    // Mark user as having watched for the first time
+                    await db.query(
+                        `UPDATE users SET 
+                         has_watched_before = TRUE,
+                         first_watch_at = COALESCE(first_watch_at, NOW())
+                         WHERE id = ? AND has_watched_before = FALSE`,
+                        [userId]
+                    );
+                    
+                    // Mark the access log as completed
+                    await db.query(
+                        `UPDATE movie_access_logs 
+                         SET completed = TRUE, watched_duration = ?
+                         WHERE id = ?`,
+                        [duration || 0, accessLog[0].id]
+                    );
+                    
+                    console.log(`User ${userId} completed free trial for movie ${movieId}`);
+                } else {
+                    // Update watched duration but don't mark as completed
+                    await db.query(
+                        `UPDATE movie_access_logs 
+                         SET watched_duration = ?
+                         WHERE id = ?`,
+                        [duration || 0, accessLog[0].id]
+                    );
+                }
+            }
+        } else {
+            // Not a free trial, just log the progress
+            await db.query(
+                `INSERT INTO movie_access_logs 
+                 (user_id, movie_id, episode_id, access_type, completed, watched_duration) 
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                [userId, movieId, null, 'watched', true, duration || 0]
+            );
+        }
 
         res.json({
             success: true,
-            message: "Movie marked as completed"
+            message: "Movie progress saved"
         });
 
     } catch (err) {
         console.error("Mark Movie Complete Error:", err);
+        res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+};
+
+// NEW: Get user's watch history
+exports.getWatchHistory = async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        const [history] = await db.query(
+            `SELECT 
+                mal.movie_id,
+                mal.episode_id,
+                mal.access_type,
+                mal.completed,
+                mal.watched_duration,
+                mal.created_at,
+                m.title as movie_title,
+                m.poster,
+                e.episode_title,
+                e.episode_number
+             FROM movie_access_logs mal
+             LEFT JOIN movies m ON mal.movie_id = m.id
+             LEFT JOIN episodes e ON mal.episode_id = e.id
+             WHERE mal.user_id = ?
+             ORDER BY mal.created_at DESC
+             LIMIT 50`,
+            [userId]
+        );
+
+        res.json({
+            success: true,
+            history
+        });
+
+    } catch (err) {
+        console.error("Get Watch History Error:", err);
         res.status(500).json({
             success: false,
             message: err.message

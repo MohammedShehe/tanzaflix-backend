@@ -44,14 +44,28 @@ const isFirstTimeWatcher = async (userId) => {
 };
 
 /**
- * Check if user already used their free trial on this movie
+ * Check if user already used their free trial on this movie (completed watching)
  */
 const hasUsedFreeTrialForMovie = async (userId, movieId) => {
     const [rows] = await db.query(
-        `SELECT id FROM movie_access_logs 
+        `SELECT id, completed FROM movie_access_logs 
          WHERE user_id = ? AND movie_id = ? 
          AND access_type = 'free_trial' AND completed = TRUE
          LIMIT 1`,
+        [userId, movieId]
+    );
+    return rows.length > 0;
+};
+
+/**
+ * Check if user has pending free trial (started but not completed)
+ */
+const hasPendingFreeTrial = async (userId, movieId) => {
+    const [rows] = await db.query(
+        `SELECT id FROM movie_access_logs 
+         WHERE user_id = ? AND movie_id = ? 
+         AND access_type = 'free_trial' AND completed = FALSE
+         ORDER BY id DESC LIMIT 1`,
         [userId, movieId]
     );
     return rows.length > 0;
@@ -148,21 +162,14 @@ const checkMovieAccess = async (req, res, next) => {
         const firstTime = await isFirstTimeWatcher(userId);
         
         if (firstTime) {
-            // 4. CHECK: Did user already use their free trial on THIS movie?
+            // 4. CHECK: Did user already use their free trial on THIS movie (completed)?
             const usedTrial = await hasUsedFreeTrialForMovie(userId, movieId);
             
             if (!usedTrial) {
-                // First time ever + haven't used trial on this movie - GRANT FREE TRIAL
-                await logMovieAccess(userId, movieId, episodeId, 'free_trial');
-                
-                // Mark user as having watched
-                await db.query(
-                    `UPDATE users SET 
-                     has_watched_before = TRUE, 
-                     first_watch_at = COALESCE(first_watch_at, NOW()) 
-                     WHERE id = ?`,
-                    [userId]
-                );
+                // First time ever + haven't completed trial on this movie - GRANT FREE TRIAL
+                // REMOVED: Immediate marking of has_watched_before
+                // Now we just log the access attempt without marking as completed
+                await logMovieAccess(userId, movieId, episodeId, 'free_trial', false, 0);
                 
                 req.accessGranted = true;
                 req.accessType = 'free_trial';
@@ -170,7 +177,7 @@ const checkMovieAccess = async (req, res, next) => {
                 req.movieInfo = movieInfo;
                 return next();
             } else {
-                // Already used free trial on this movie - DENY
+                // Already completed free trial on this movie - DENY
                 await logMovieAccess(userId, movieId, episodeId, 'denied');
                 
                 return res.status(403).json({
@@ -247,6 +254,7 @@ module.exports = {
     hasPurchasedMovie,
     isFirstTimeWatcher,
     hasUsedFreeTrialForMovie,
+    hasPendingFreeTrial,
     getMovieInfo,
     logMovieAccess
 };
