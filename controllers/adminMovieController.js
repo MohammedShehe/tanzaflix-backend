@@ -730,3 +730,121 @@ exports.deleteMovie = async (req, res) => {
         connection.release();
     }
 };
+
+// ==================== GET MOVIE STATS ====================
+exports.getMovieStats = async (req, res) => {
+    try {
+        // Get total movies count
+        const [totalMovies] = await db.query(
+            `SELECT COUNT(*) as total FROM movies`
+        );
+
+        // Get movies by type
+        const [moviesByType] = await db.query(
+            `SELECT 
+                movie_type,
+                COUNT(*) as count
+             FROM movies
+             GROUP BY movie_type`
+        );
+
+        // Get movies by category
+        const [moviesByCategory] = await db.query(
+            `SELECT 
+                category,
+                COUNT(*) as count
+             FROM movies
+             GROUP BY category`
+        );
+
+        // Get movies by country
+        const [moviesByCountry] = await db.query(
+            `SELECT 
+                country,
+                COUNT(*) as count
+             FROM movies
+             GROUP BY country`
+        );
+
+        // Get movies by year
+        const [moviesByYear] = await db.query(
+            `SELECT 
+                year,
+                COUNT(*) as count
+             FROM movies
+             GROUP BY year
+             ORDER BY year DESC`
+        );
+
+        // Get total seasons and episodes for series
+        const [seriesStats] = await db.query(
+            `SELECT 
+                COUNT(DISTINCT s.id) as total_seasons,
+                COUNT(e.id) as total_episodes
+             FROM seasons s
+             LEFT JOIN episodes e ON s.id = e.season_id
+             WHERE s.movie_id IN (SELECT id FROM movies WHERE movie_type = 'series')`
+        );
+
+        // Get recent movies (last 30 days)
+        const [recentMovies] = await db.query(
+            `SELECT 
+                COUNT(*) as count
+             FROM movies
+             WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)`
+        );
+
+        // Get movies with price distribution (free vs paid)
+        const [priceStats] = await db.query(
+            `SELECT 
+                CASE 
+                    WHEN price = 0 THEN 'Free'
+                    ELSE 'Paid'
+                END as price_type,
+                COUNT(*) as count,
+                AVG(price) as avg_price
+             FROM movies
+             GROUP BY price_type`
+        );
+
+        // Get total revenue from movies
+        const [revenueStats] = await db.query(
+            `SELECT 
+                COUNT(*) as total_purchases,
+                SUM(amount) as total_revenue
+             FROM movie_purchases
+             WHERE status = 'completed'`
+        );
+
+        // Combine all stats
+        const stats = {
+            total_movies: totalMovies[0].total || 0,
+            movies_by_type: moviesByType,
+            movies_by_category: moviesByCategory,
+            movies_by_country: moviesByCountry,
+            movies_by_year: moviesByYear,
+            series_stats: {
+                total_seasons: seriesStats[0]?.total_seasons || 0,
+                total_episodes: seriesStats[0]?.total_episodes || 0
+            },
+            recent_30_days: recentMovies[0]?.count || 0,
+            price_distribution: priceStats,
+            revenue: {
+                total_purchases: revenueStats[0]?.total_purchases || 0,
+                total_revenue: parseFloat(revenueStats[0]?.total_revenue || 0)
+            }
+        };
+
+        res.json({
+            success: true,
+            stats
+        });
+
+    } catch (err) {
+        console.error("Get Movie Stats Error:", err);
+        res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+};
