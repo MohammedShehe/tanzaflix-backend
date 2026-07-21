@@ -98,12 +98,17 @@ CREATE TABLE `movie_access_logs` (
   PRIMARY KEY (`id`),
   KEY `idx_user_movie` (`user_id`,`movie_id`),
   KEY `idx_user_episode` (`user_id`,`episode_id`),
-  KEY `fk_access_log_movie` (`movie_id`),
   KEY `fk_access_log_episode` (`episode_id`),
+  KEY `idx_created_at` (`created_at`),
+  KEY `idx_access_type` (`access_type`),
+  KEY `idx_completed` (`completed`),
+  KEY `idx_user_created` (`user_id`,`created_at`),
+  KEY `idx_user_type_created` (`user_id`,`access_type`,`created_at`),
+  KEY `idx_movie_created` (`movie_id`,`created_at`),
   CONSTRAINT `fk_access_log_episode` FOREIGN KEY (`episode_id`) REFERENCES `episodes` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_access_log_movie` FOREIGN KEY (`movie_id`) REFERENCES `movies` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_access_log_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -112,7 +117,7 @@ CREATE TABLE `movie_access_logs` (
 
 LOCK TABLES `movie_access_logs` WRITE;
 /*!40000 ALTER TABLE `movie_access_logs` DISABLE KEYS */;
-INSERT INTO `movie_access_logs` VALUES (1,4,2,NULL,'denied',0,0,'2026-07-20 23:54:53');
+INSERT INTO `movie_access_logs` VALUES (1,4,2,NULL,'denied',0,0,'2026-07-20 23:54:53'),(2,4,2,NULL,'free_trial',0,0,'2026-07-21 00:02:55'),(3,4,2,NULL,'free_trial',0,0,'2026-07-21 00:02:55');
 /*!40000 ALTER TABLE `movie_access_logs` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -277,6 +282,9 @@ CREATE TABLE `payments` (
   KEY `idx_user_status` (`user_id`,`status`),
   KEY `idx_created_at` (`created_at`),
   KEY `idx_status` (`status`),
+  KEY `idx_paid_at` (`paid_at`),
+  KEY `idx_status_paid` (`status`,`paid_at`),
+  KEY `idx_user_paid` (`user_id`,`status`,`paid_at`),
   CONSTRAINT `payments_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `payments_ibfk_2` FOREIGN KEY (`plan_id`) REFERENCES `plans` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -370,6 +378,8 @@ CREATE TABLE `subscriptions` (
   KEY `plan_id` (`plan_id`),
   KEY `idx_user_status` (`user_id`,`status`),
   KEY `idx_expires_at` (`expires_at`),
+  KEY `idx_user_expires` (`user_id`,`status`,`expires_at`),
+  KEY `idx_expires_status` (`expires_at`,`status`),
   CONSTRAINT `subscriptions_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `subscriptions_ibfk_2` FOREIGN KEY (`plan_id`) REFERENCES `plans` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -410,7 +420,9 @@ CREATE TABLE `users` (
   `first_watch_at` timestamp NULL DEFAULT NULL,
   `has_watched_before` tinyint(1) DEFAULT 0,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `email` (`email`)
+  UNIQUE KEY `email` (`email`),
+  KEY `idx_role_created` (`role`,`created_at`),
+  KEY `idx_has_watched` (`has_watched_before`)
 ) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -420,7 +432,7 @@ CREATE TABLE `users` (
 
 LOCK TABLES `users` WRITE;
 /*!40000 ALTER TABLE `users` DISABLE KEYS */;
-INSERT INTO `users` VALUES (1,'Administrator','+255677532140','Tanzania','Zanzibar',NULL,'mosnake111@gmail.com','$2b$10$8fFd8Tv6nQFROPWCt5vPt.4AavVo4155kbwDfLcRXbk4rKnH1vOWi','admin','2026-07-18 18:14:30',NULL,NULL,NULL,NULL,NULL,NULL,0),(4,'MO 11','0677532140','Kenya',NULL,'https://res.cloudinary.com/dlokcqf1h/image/upload/v1784405558/profiles/kfrcqtc8rilsrkiaumxd.png','molittle1011@gmail.com','$2b$10$ARmtTBWI1RdzD1/0wauZNuF0ZxlRlJEFaiskfZ0HwXzv978cU2MQa','user','2026-07-18 20:12:36','profiles/kfrcqtc8rilsrkiaumxd',NULL,NULL,NULL,NULL,'2026-07-20 23:25:02',1);
+INSERT INTO `users` VALUES (1,'Administrator','+255677532140','Tanzania','Zanzibar',NULL,'mosnake111@gmail.com','$2b$10$8fFd8Tv6nQFROPWCt5vPt.4AavVo4155kbwDfLcRXbk4rKnH1vOWi','admin','2026-07-18 18:14:30',NULL,NULL,NULL,NULL,NULL,NULL,0),(4,'MO 11','0677532140','Kenya',NULL,'https://res.cloudinary.com/dlokcqf1h/image/upload/v1784405558/profiles/kfrcqtc8rilsrkiaumxd.png','molittle1011@gmail.com','$2b$10$ARmtTBWI1RdzD1/0wauZNuF0ZxlRlJEFaiskfZ0HwXzv978cU2MQa','user','2026-07-18 20:12:36','profiles/kfrcqtc8rilsrkiaumxd',NULL,NULL,NULL,NULL,NULL,0);
 /*!40000 ALTER TABLE `users` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -445,6 +457,8 @@ CREATE TABLE `watch_progress` (
   KEY `episode_id` (`episode_id`),
   KEY `idx_watch_progress_user` (`user_id`),
   KEY `idx_watch_progress_movie` (`movie_id`),
+  KEY `idx_last_updated` (`last_updated`),
+  KEY `idx_user_movie` (`user_id`,`movie_id`),
   CONSTRAINT `watch_progress_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `watch_progress_ibfk_2` FOREIGN KEY (`movie_id`) REFERENCES `movies` (`id`) ON DELETE CASCADE,
   CONSTRAINT `watch_progress_ibfk_3` FOREIGN KEY (`episode_id`) REFERENCES `episodes` (`id`) ON DELETE CASCADE
@@ -469,4 +483,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-07-21  5:26:31
+-- Dump completed on 2026-07-21  6:51:22

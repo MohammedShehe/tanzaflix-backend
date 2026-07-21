@@ -27,6 +27,7 @@ app.use("/api/user/movies", require("./routes/userMovieRoutes")); // User routes
 app.use("/api/plans", require("./routes/planRoutes"));
 app.use("/api/payments", require("./routes/paymentRoutes"));
 app.use("/api/movie-purchases", require("./routes/moviePurchaseRoutes"));
+app.use("/api/admin/activities", require("./routes/adminActivitiesRoutes"));
 
 // Health check
 app.get("/health", (req, res) => {
