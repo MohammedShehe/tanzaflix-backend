@@ -357,7 +357,7 @@ exports.adminGetAllPayments = async (req, res) => {
         const [payments] = await db.query(
             `SELECT 
                 p.*,
-                u.name as user_name,
+                u.full_name as user_name,
                 u.email as user_email,
                 pl.name as plan_name
             FROM payments p
