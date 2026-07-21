@@ -1,67 +1,53 @@
 const router = require("express").Router();
-
 const upload = require("../middleware/upload");
-
 const {
-
     authenticate,
-
     isAdmin
-
 } = require("../middleware/authMiddleware");
-
 const controller = require("../controllers/adminUserController");
 
-router.post(
-
-    "/create",
-
-    authenticate,
-
-    isAdmin,
-
-    upload.single("profile_image"),
-
-    controller.createUser
-
-);
-
+// ==================== STATS ROUTE ====================
 router.get(
-
-    "/",
-
+    "/stats",
     authenticate,
-
     isAdmin,
-
-    controller.getUsers
-
+    controller.getUserStats
 );
 
-router.put(
+// ==================== USER ROUTES ====================
 
-    "/:id",
-
+// Create user
+router.post(
+    "/create",
     authenticate,
-
     isAdmin,
-
     upload.single("profile_image"),
-
-    controller.updateUser
-
+    controller.createUser
 );
 
-router.delete(
-
-    "/:id",
-
+// Get all users
+router.get(
+    "/",
     authenticate,
-
     isAdmin,
+    controller.getUsers
+);
 
+// Update user - This must come AFTER /stats
+router.put(
+    "/:id",
+    authenticate,
+    isAdmin,
+    upload.single("profile_image"),
+    controller.updateUser
+);
+
+// Delete user
+router.delete(
+    "/:id",
+    authenticate,
+    isAdmin,
     controller.deleteUser
-
 );
 
 module.exports = router;
