@@ -7,7 +7,7 @@ exports.createMoviePurchase = async (req, res) => {
     try {
         const userId = req.user.id;
         const movieId = req.params.id;
-        const { paymentMethod, phoneNumber } = req.body;
+        const { paymentMethod, phoneNumber, accountName, cardNumber, expiryDate, cvv } = req.body;
 
         // Get movie details
         const [movies] = await db.query(
@@ -40,6 +40,56 @@ exports.createMoviePurchase = async (req, res) => {
             });
         }
 
+        // Validate payment method
+        if (!paymentMethod) {
+            return res.status(400).json({
+                success: false,
+                message: "Payment method is required"
+            });
+        }
+
+        // For mobile money, phone number is required
+        if (['mpesa', 'airtel_money', 'mix_by_yas'].includes(paymentMethod) && !phoneNumber) {
+            return res.status(400).json({
+                success: false,
+                message: "Phone number is required for mobile money payments"
+            });
+        }
+
+        // For bank card, card details are required
+        if (paymentMethod === 'bank_card') {
+            if (!cardNumber || !expiryDate || !cvv) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Card details are required for bank card payments",
+                    required: ['cardNumber', 'expiryDate', 'cvv']
+                });
+            }
+            // Validate card number format
+            const cleanCard = cardNumber.replace(/\s/g, '');
+            if (!/^\d{13,19}$/.test(cleanCard)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid card number. Must be 13-19 digits."
+                });
+            }
+            // Validate expiry date format
+            const cleanExpiry = expiryDate.replace(/\s/g, '');
+            if (!/^\d{2}\/\d{2}$/.test(cleanExpiry) && !/^\d{4}$/.test(cleanExpiry)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid expiry date format. Use MM/YY or MMYY."
+                });
+            }
+            // Validate CVV
+            if (!/^\d{3,4}$/.test(cvv)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid CVV. Must be 3-4 digits."
+                });
+            }
+        }
+
         // Generate reference
         const reference = "MP-" + Date.now() + "-" + crypto.randomBytes(4).toString("hex").toUpperCase();
 
@@ -55,9 +105,16 @@ exports.createMoviePurchase = async (req, res) => {
         const [payment] = await db.query(
             `INSERT INTO payments 
              (user_id, plan_id, payment_reference, payment_method, 
-              phone_number, amount, currency, status) 
-             VALUES (?, NULL, ?, ?, ?, ?, 'TZS', 'pending')`,
-            [userId, reference, paymentMethod, phoneNumber, movie.price]
+              phone_number, account_name, amount, currency, status) 
+             VALUES (?, NULL, ?, ?, ?, ?, ?, 'TZS', 'pending')`,
+            [
+                userId, 
+                reference, 
+                paymentMethod, 
+                phoneNumber || null,
+                accountName || null,
+                movie.price
+            ]
         );
 
         // Update purchase with payment ID
@@ -66,24 +123,55 @@ exports.createMoviePurchase = async (req, res) => {
             [payment.insertId, purchase.insertId]
         );
 
-        // Send to AzamPay
-        const checkoutPayload = {
-            provider: paymentMethod,
-            merchantAccountNumber: process.env.AZAMPAY_ACCOUNT_NUMBER,
-            merchantName: "TanzaFlix",
-            merchantMobileNumber: phoneNumber,
-            currencyCode: "TZS",
-            amount: movie.price.toString(),
-            referenceId: reference,
-            merchantReferenceId: reference,
-            additionalProperties: {
+        // ============================
+        // SEND PAYMENT TO AZAMPAY
+        // ============================
+        let checkoutPayload;
+
+        if (paymentMethod === 'bank_card') {
+            // Bank card payload
+            checkoutPayload = {
+                provider: "CARD",
+                merchantAccountNumber: process.env.AZAMPAY_ACCOUNT_NUMBER,
+                merchantName: "TanzaFlix",
+                currencyCode: "TZS",
+                amount: movie.price.toString(),
+                referenceId: reference,
+                merchantReferenceId: reference,
+                cardNumber: cardNumber.replace(/\s/g, ''),
+                expiryDate: expiryDate.replace(/\s/g, ''),
+                cvv: cvv,
+                accountName: accountName || "TanzaFlix User",
+                additionalProperties: {
+                    provider: "CARD",
+                    movieId: movieId,
+                    movieTitle: movie.title,
+                    purchaseType: "movie"
+                },
+                source: "TanzaFlix"
+            };
+        } else {
+            // Mobile money payload
+            checkoutPayload = {
                 provider: paymentMethod,
-                movieId: movieId,
-                movieTitle: movie.title,
-                purchaseType: "movie"
-            },
-            source: "TanzaFlix"
-        };
+                merchantAccountNumber: process.env.AZAMPAY_ACCOUNT_NUMBER,
+                merchantName: "TanzaFlix",
+                merchantMobileNumber: phoneNumber,
+                currencyCode: "TZS",
+                amount: movie.price.toString(),
+                referenceId: reference,
+                merchantReferenceId: reference,
+                additionalProperties: {
+                    provider: paymentMethod,
+                    movieId: movieId,
+                    movieTitle: movie.title,
+                    purchaseType: "movie"
+                },
+                source: "TanzaFlix"
+            };
+        }
+
+        console.log("Sending Movie Purchase AzamPay payload:", JSON.stringify(checkoutPayload, null, 2));
 
         const checkoutResponse = await azampay.createCheckout(checkoutPayload);
 
@@ -112,9 +200,18 @@ exports.createMoviePurchase = async (req, res) => {
 
     } catch (err) {
         console.error("Movie Purchase Error:", err);
+        
+        // Handle specific AzamPay errors
+        let errorMessage = err.message;
+        if (err.response?.data?.message) {
+            errorMessage = err.response.data.message;
+        } else if (err.message === 'read ECONNRESET') {
+            errorMessage = "Connection to payment gateway failed. Please try again or use a different payment method.";
+        }
+        
         res.status(500).json({
             success: false,
-            message: err.message
+            message: errorMessage
         });
     }
 };
@@ -193,16 +290,21 @@ exports.verifyPurchase = async (req, res) => {
 // Webhook callback for movie purchases
 exports.handlePurchaseCallback = async (req, res) => {
     try {
-        console.log("Movie Purchase Callback:", JSON.stringify(req.body, null, 2));
+        console.log("Movie Purchase Callback Received:", JSON.stringify(req.body, null, 2));
 
         const {
             initiatorReferenceId,
             pgReferenceId,
             status,
-            message
+            message,
+            fspReferenceId,
+            amount,
+            operator
         } = req.body;
 
-        // Find payment
+        // ============================
+        // FIND PAYMENT
+        // ============================
         const [payments] = await db.query(
             `SELECT p.*, mp.id as purchase_id 
              FROM payments p
@@ -221,36 +323,52 @@ exports.handlePurchaseCallback = async (req, res) => {
 
         const payment = payments[0];
 
-        // Check if already processed
+        // ============================
+        // IDEMPOTENCY - PREVENT DOUBLE PROCESSING
+        // ============================
         if (payment.status === 'paid') {
             console.log("Payment already processed:", initiatorReferenceId);
-            return res.json({ success: true, message: "Already processed" });
+            return res.json({ 
+                success: true, 
+                message: "Already processed" 
+            });
         }
 
-        let paymentStatus = status.toLowerCase();
+        // ============================
+        // DETERMINE PAYMENT STATUS
+        // ============================
+        let paymentStatus = (status || '').toLowerCase();
         if (paymentStatus === "success" || paymentStatus === "completed") {
             paymentStatus = "paid";
         } else if (paymentStatus === "failed" || paymentStatus === "error") {
             paymentStatus = "failed";
         }
 
-        // Update payment
+        // ============================
+        // UPDATE PAYMENT
+        // ============================
         await db.query(
             `UPDATE payments 
-             SET status = ?, gateway_transaction_id = ?, 
-                 gateway_response = ?, paid_at = ?
+             SET 
+                status = ?, 
+                gateway_transaction_id = ?, 
+                gateway_response = ?, 
+                paid_at = ?
              WHERE id = ?`,
             [
                 paymentStatus,
-                pgReferenceId || null,
+                pgReferenceId || fspReferenceId || null,
                 JSON.stringify(req.body),
                 paymentStatus === 'paid' ? new Date() : null,
                 payment.id
             ]
         );
 
-        // If paid, update purchase
+        // ============================
+        // IF PAID - UPDATE PURCHASE & ACTIVATE ACCESS
+        // ============================
         if (paymentStatus === 'paid' && payment.purchase_id) {
+            // Update purchase status
             await db.query(
                 `UPDATE movie_purchases 
                  SET status = 'completed', 
@@ -258,6 +376,16 @@ exports.handlePurchaseCallback = async (req, res) => {
                  WHERE id = ?`,
                 [payment.purchase_id]
             );
+
+            // Log access (optional - for tracking)
+            await db.query(
+                `INSERT INTO movie_access_logs 
+                 (user_id, movie_id, access_type, completed) 
+                 VALUES (?, ?, 'paid_single', 1)`,
+                [payment.user_id, payment.movie_id]
+            );
+
+            console.log(`✅ Movie purchase activated for user ${payment.user_id}, movie ${payment.movie_id}`);
         }
 
         console.log(`Movie purchase ${paymentStatus} for reference: ${initiatorReferenceId}`);
