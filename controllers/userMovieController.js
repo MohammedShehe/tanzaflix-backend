@@ -10,8 +10,72 @@ const hasWatchedEnough = (watchedDuration, totalDuration) => {
     return percentage >= 30 || watchedDuration >= 300;
 };
 
+// Helper function to get movie rating info
+const getMovieRatingInfo = async (movieId, userId = null) => {
+    try {
+        // Get movie rating stats
+        const [movieRating] = await db.query(
+            `SELECT 
+                avg_rating,
+                total_ratings
+             FROM movies 
+             WHERE id = ?`,
+            [movieId]
+        );
+
+        const ratingInfo = {
+            average: parseFloat(movieRating[0]?.avg_rating || 0),
+            total: movieRating[0]?.total_ratings || 0,
+            display: movieRating[0]?.total_ratings > 0 ? 
+                `${parseFloat(movieRating[0]?.avg_rating || 0).toFixed(1)}/10` : 
+                "Not rated yet"
+        };
+
+        // If userId provided, check if user has rated this movie
+        if (userId) {
+            const [userRating] = await db.query(
+                `SELECT 
+                    id,
+                    rating,
+                    review_text,
+                    created_at
+                 FROM movie_ratings 
+                 WHERE user_id = ? AND movie_id = ?`,
+                [userId, movieId]
+            );
+
+            ratingInfo.user_has_rated = userRating.length > 0;
+            ratingInfo.user_rating = userRating.length > 0 ? {
+                id: userRating[0].id,
+                rating: userRating[0].rating,
+                review_text: userRating[0].review_text,
+                created_at: userRating[0].created_at
+            } : null;
+            ratingInfo.can_rate = !(userRating.length > 0); // Can only rate if not already rated
+            ratingInfo.can_edit = false; // No editing allowed
+            ratingInfo.can_rerate = false; // No re-rating allowed
+        }
+
+        return ratingInfo;
+    } catch (error) {
+        console.error("Error getting rating info:", error);
+        return {
+            average: 0,
+            total: 0,
+            display: "Not rated yet",
+            user_has_rated: false,
+            user_rating: null,
+            can_rate: true,
+            can_edit: false,
+            can_rerate: false
+        };
+    }
+};
+
 exports.getMovies = async (req, res) => {
     try {
+        const userId = req.user.id;
+
         const [movies] = await db.query(
             `SELECT
                 id,
@@ -25,7 +89,9 @@ exports.getMovies = async (req, res) => {
                 description,
                 poster,
                 movie_time,
-                created_at
+                created_at,
+                avg_rating,
+                total_ratings
              FROM movies
              ORDER BY id DESC`
         );
@@ -95,7 +161,6 @@ exports.getMovies = async (req, res) => {
         });
 
         // Get user's access status
-        const userId = req.user.id;
         const [subscription] = await db.query(
             `SELECT id, expires_at FROM subscriptions 
              WHERE user_id = ? AND status = 'active' AND expires_at > NOW()
@@ -120,14 +185,29 @@ exports.getMovies = async (req, res) => {
         );
         const isFirstTime = !userData[0]?.has_watched_before;
 
-        const formattedMovies = movies.map(movie => {
+        // Get rating for each movie and check if user has rated
+        const formattedMovies = [];
+        for (const movie of movies) {
+            // Get rating info for this movie
+            const ratingInfo = await getMovieRatingInfo(movie.id, userId);
+
             const movieData = {
                 ...movie,
                 more_like_this: recommendationMap[movie.id] || [],
                 canWatch: hasSubscription || purchasedMovieIds.includes(movie.id),
                 hasSubscription: hasSubscription,
                 isPurchased: purchasedMovieIds.includes(movie.id),
-                isFirstTime: isFirstTime
+                isFirstTime: isFirstTime,
+                rating: {
+                    average: ratingInfo.average,
+                    total: ratingInfo.total,
+                    display: ratingInfo.display,
+                    user_has_rated: ratingInfo.user_has_rated,
+                    user_rating: ratingInfo.user_rating,
+                    can_rate: ratingInfo.can_rate,
+                    can_edit: ratingInfo.can_edit,
+                    can_rerate: ratingInfo.can_rerate
+                }
             };
 
             if (movie.movie_type === 'series' && seasonsMap[movie.id]) {
@@ -137,8 +217,8 @@ exports.getMovies = async (req, res) => {
             // Remove video_url from listing - only show in single view with access
             delete movieData.video;
 
-            return movieData;
-        });
+            formattedMovies.push(movieData);
+        }
 
         res.json({
             success: true,
@@ -177,7 +257,9 @@ exports.getMovie = async (req, res) => {
                 poster,
                 video,
                 movie_time,
-                created_at
+                created_at,
+                avg_rating,
+                total_ratings
              FROM movies
              WHERE id = ?`,
             [movieId]
@@ -326,6 +408,9 @@ exports.getMovie = async (req, res) => {
             delete movie.video;
         }
 
+        // Get rating info for this movie
+        const ratingInfo = await getMovieRatingInfo(movieId, userId);
+
         // Prepare response
         const response = {
             success: true,
@@ -337,6 +422,16 @@ exports.getMovie = async (req, res) => {
                 hasSubscription,
                 hasPurchased,
                 isFirstTime,
+                rating: {
+                    average: ratingInfo.average,
+                    total: ratingInfo.total,
+                    display: ratingInfo.display,
+                    user_has_rated: ratingInfo.user_has_rated,
+                    user_rating: ratingInfo.user_rating,
+                    can_rate: ratingInfo.can_rate,
+                    can_edit: ratingInfo.can_edit,
+                    can_rerate: ratingInfo.can_rerate
+                },
                 subscriptionPlans: !hasSubscription ? "/api/plans" : null,
                 purchaseAction: !hasSubscription && !hasPurchased && !isFirstTime ? 
                     `/api/payments/create-movie-purchase/${movieId}` : null
