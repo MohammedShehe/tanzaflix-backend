@@ -293,3 +293,264 @@ exports.resetPassword = async (req, res) => {
         });
     }
 };
+
+// controllers/authController.js - Add these functions
+
+// ==================== RESEND OTP ====================
+exports.resendOTP = async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({
+                success: false,
+                message: "Email is required"
+            });
+        }
+
+        // Find user
+        const [rows] = await db.query(
+            "SELECT * FROM users WHERE email=?",
+            [email]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        const user = rows[0];
+
+        // Check if user is admin (for login OTP)
+        // Check if OTP is for login or password reset based on context
+        const { type = 'login' } = req.query; // 'login' or 'reset'
+
+        // Rate limiting - Check if OTP was requested recently (within 60 seconds)
+        let lastOTPRequest = null;
+        if (type === 'login') {
+            // Check last login OTP request
+            const [lastRequest] = await db.query(
+                "SELECT login_otp_expiry FROM users WHERE id=?",
+                [user.id]
+            );
+            if (lastRequest.length > 0 && lastRequest[0].login_otp_expiry) {
+                lastOTPRequest = new Date(lastRequest[0].login_otp_expiry);
+                // If OTP hasn't expired yet, check time since creation
+                const timeSinceCreation = Date.now() - (lastOTPRequest.getTime() - 5 * 60 * 1000);
+                if (timeSinceCreation < 60000) { // 60 seconds cooldown
+                    return res.status(429).json({
+                        success: false,
+                        message: "Please wait 60 seconds before requesting a new OTP",
+                        wait_time: Math.ceil((60000 - timeSinceCreation) / 1000)
+                    });
+                }
+            }
+        } else {
+            // Check last reset OTP request
+            const [lastRequest] = await db.query(
+                "SELECT reset_otp_expiry FROM users WHERE id=?",
+                [user.id]
+            );
+            if (lastRequest.length > 0 && lastRequest[0].reset_otp_expiry) {
+                lastOTPRequest = new Date(lastRequest[0].reset_otp_expiry);
+                const timeSinceCreation = Date.now() - (lastOTPRequest.getTime() - 5 * 60 * 1000);
+                if (timeSinceCreation < 60000) {
+                    return res.status(429).json({
+                        success: false,
+                        message: "Please wait 60 seconds before requesting a new OTP",
+                        wait_time: Math.ceil((60000 - timeSinceCreation) / 1000)
+                    });
+                }
+            }
+        }
+
+        // Generate new OTP
+        const otp = generateOTP();
+        const expiry = new Date(Date.now() + 5 * 60 * 1000);
+
+        // Update OTP in database
+        if (type === 'login') {
+            await db.query(
+                "UPDATE users SET login_otp=?, login_otp_expiry=? WHERE id=?",
+                [otp, expiry, user.id]
+            );
+        } else {
+            await db.query(
+                "UPDATE users SET reset_otp=?, reset_otp_expiry=? WHERE id=?",
+                [otp, expiry, user.id]
+            );
+        }
+
+        // Send OTP email
+        const emailType = type === 'login' ? 'login' : 'reset';
+        await sendOTP(user.email, otp, emailType);
+
+        res.json({
+            success: true,
+            message: "New OTP sent to your email",
+            email: user.email,
+            expires_in: "5 minutes"
+        });
+
+    } catch (err) {
+        console.error("Resend OTP Error:", err);
+        res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+};
+
+// ==================== RESEND ADMIN LOGIN OTP ====================
+exports.resendLoginOTP = async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({
+                success: false,
+                message: "Email is required"
+            });
+        }
+
+        // Find user
+        const [rows] = await db.query(
+            "SELECT * FROM users WHERE email=? AND role='admin'",
+            [email]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Admin not found"
+            });
+        }
+
+        const admin = rows[0];
+
+        // Check cooldown - 60 seconds between resends
+        const [lastOTP] = await db.query(
+            "SELECT login_otp, login_otp_expiry FROM users WHERE id=?",
+            [admin.id]
+        );
+
+        if (lastOTP.length > 0 && lastOTP[0].login_otp_expiry) {
+            const expiryTime = new Date(lastOTP[0].login_otp_expiry);
+            const timeSinceCreation = Date.now() - (expiryTime.getTime() - 5 * 60 * 1000);
+            
+            if (timeSinceCreation < 60000) {
+                const remainingSeconds = Math.ceil((60000 - timeSinceCreation) / 1000);
+                return res.status(429).json({
+                    success: false,
+                    message: `Please wait ${remainingSeconds} seconds before requesting a new OTP`,
+                    wait_time: remainingSeconds
+                });
+            }
+        }
+
+        // Generate new OTP
+        const otp = generateOTP();
+        const expiry = new Date(Date.now() + 5 * 60 * 1000);
+
+        // Update database
+        await db.query(
+            "UPDATE users SET login_otp=?, login_otp_expiry=? WHERE id=?",
+            [otp, expiry, admin.id]
+        );
+
+        // Send OTP
+        await sendOTP(admin.email, otp, 'login');
+
+        res.json({
+            success: true,
+            message: "New OTP sent to your email",
+            email: admin.email,
+            expires_in: "5 minutes"
+        });
+
+    } catch (err) {
+        console.error("Resend Login OTP Error:", err);
+        res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+};
+
+// ==================== RESEND PASSWORD RESET OTP ====================
+exports.resendResetOTP = async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({
+                success: false,
+                message: "Email is required"
+            });
+        }
+
+        // Find user
+        const [rows] = await db.query(
+            "SELECT * FROM users WHERE email=?",
+            [email]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        const user = rows[0];
+
+        // Check cooldown
+        const [lastOTP] = await db.query(
+            "SELECT reset_otp, reset_otp_expiry FROM users WHERE id=?",
+            [user.id]
+        );
+
+        if (lastOTP.length > 0 && lastOTP[0].reset_otp_expiry) {
+            const expiryTime = new Date(lastOTP[0].reset_otp_expiry);
+            const timeSinceCreation = Date.now() - (expiryTime.getTime() - 5 * 60 * 1000);
+            
+            if (timeSinceCreation < 60000) {
+                const remainingSeconds = Math.ceil((60000 - timeSinceCreation) / 1000);
+                return res.status(429).json({
+                    success: false,
+                    message: `Please wait ${remainingSeconds} seconds before requesting a new OTP`,
+                    wait_time: remainingSeconds
+                });
+            }
+        }
+
+        // Generate new OTP
+        const otp = generateOTP();
+        const expiry = new Date(Date.now() + 5 * 60 * 1000);
+
+        // Update database
+        await db.query(
+            "UPDATE users SET reset_otp=?, reset_otp_expiry=? WHERE id=?",
+            [otp, expiry, user.id]
+        );
+
+        // Send OTP
+        await sendOTP(user.email, otp, 'reset');
+
+        res.json({
+            success: true,
+            message: "New OTP sent to your email",
+            email: user.email,
+            expires_in: "5 minutes"
+        });
+
+    } catch (err) {
+        console.error("Resend Reset OTP Error:", err);
+        res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+};

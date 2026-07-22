@@ -260,6 +260,39 @@ INSERT INTO `movies` VALUES (1,'Movie La Kutisha','series','Bongo Movie','Kiswah
 UNLOCK TABLES;
 
 --
+-- Table structure for table `otp_requests`
+--
+
+DROP TABLE IF EXISTS `otp_requests`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `otp_requests` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `email` varchar(255) NOT NULL,
+  `type` enum('login','reset') NOT NULL,
+  `ip_address` varchar(45) DEFAULT NULL,
+  `user_agent` text DEFAULT NULL,
+  `status` enum('sent','verified','expired','failed') DEFAULT 'sent',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_user_type` (`user_id`,`type`),
+  KEY `idx_created_at` (`created_at`),
+  KEY `idx_ip_address` (`ip_address`),
+  CONSTRAINT `otp_requests_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `otp_requests`
+--
+
+LOCK TABLES `otp_requests` WRITE;
+/*!40000 ALTER TABLE `otp_requests` DISABLE KEYS */;
+/*!40000 ALTER TABLE `otp_requests` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `payment_logs`
 --
 
@@ -519,4 +552,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-07-22  8:15:43
+-- Dump completed on 2026-07-22  8:30:00
