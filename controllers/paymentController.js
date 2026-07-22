@@ -6,14 +6,56 @@ const azampay = require("../services/azampayService");
 exports.createPayment = async (req, res) => {
     try {
         const userId = req.user.id;
-        const { planId, paymentMethod, phoneNumber } = req.body;
+        const { planId, paymentMethod, phoneNumber, accountName, cardNumber, expiryDate, cvv } = req.body;
 
         // Validate input
-        if (!planId || !paymentMethod || !phoneNumber) {
+        if (!planId || !paymentMethod) {
             return res.status(400).json({
                 success: false,
-                message: "All fields are required."
+                message: "Plan ID and payment method are required."
             });
+        }
+
+        // For mobile money, phone number is required
+        if (['mpesa', 'airtel_money', 'mix_by_yas'].includes(paymentMethod) && !phoneNumber) {
+            return res.status(400).json({
+                success: false,
+                message: "Phone number is required for mobile money payments."
+            });
+        }
+
+        // For bank card, card details are required
+        if (paymentMethod === 'bank_card') {
+            if (!cardNumber || !expiryDate || !cvv) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Card details are required for bank card payments.",
+                    required: ['cardNumber', 'expiryDate', 'cvv']
+                });
+            }
+            // Validate card number format (basic)
+            const cleanCard = cardNumber.replace(/\s/g, '');
+            if (!/^\d{13,19}$/.test(cleanCard)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid card number. Must be 13-19 digits."
+                });
+            }
+            // Validate expiry date format
+            const cleanExpiry = expiryDate.replace(/\s/g, '');
+            if (!/^\d{2}\/\d{2}$/.test(cleanExpiry) && !/^\d{4}$/.test(cleanExpiry)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid expiry date format. Use MM/YY or MMYY."
+                });
+            }
+            // Validate CVV
+            if (!/^\d{3,4}$/.test(cvv)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid CVV. Must be 3-4 digits."
+                });
+            }
         }
 
         // Get plan from database
@@ -38,28 +80,64 @@ exports.createPayment = async (req, res) => {
         const [payment] = await db.query(
             `INSERT INTO payments (
                 user_id, plan_id, payment_reference, payment_method, 
-                phone_number, amount, status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [userId, plan.id, paymentReference, paymentMethod, phoneNumber, plan.price, "pending"]
+                phone_number, account_name, amount, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                userId, 
+                plan.id, 
+                paymentReference, 
+                paymentMethod, 
+                phoneNumber || null,
+                accountName || null,
+                plan.price, 
+                "pending"
+            ]
         );
 
         // ============================
         // SEND PAYMENT TO AZAMPAY
         // ============================
-        const checkoutPayload = {
-            provider: paymentMethod,
-            merchantAccountNumber: process.env.AZAMPAY_ACCOUNT_NUMBER,
-            merchantName: "TanzaFlix",
-            merchantMobileNumber: phoneNumber,
-            currencyCode: "TZS",
-            amount: plan.price.toString(),
-            referenceId: paymentReference,
-            merchantReferenceId: paymentReference,
-            additionalProperties: {
-                provider: paymentMethod
-            },
-            source: "TanzaFlix"
-        };
+        let checkoutPayload;
+
+        if (paymentMethod === 'bank_card') {
+            // Bank card payload - Using "CARD" as provider (common in AzamPay)
+            checkoutPayload = {
+                provider: "CARD",  // Try "CARD" instead of "BANK_CARD"
+                merchantAccountNumber: process.env.AZAMPAY_ACCOUNT_NUMBER,
+                merchantName: "TanzaFlix",
+                currencyCode: "TZS",
+                amount: plan.price.toString(),
+                referenceId: paymentReference,
+                merchantReferenceId: paymentReference,
+                cardNumber: cardNumber.replace(/\s/g, ''),
+                expiryDate: expiryDate.replace(/\s/g, ''),
+                cvv: cvv,
+                accountName: accountName || "TanzaFlix User",
+                additionalProperties: {
+                    provider: "CARD",
+                    paymentType: "subscription"
+                },
+                source: "TanzaFlix"
+            };
+        } else {
+            // Mobile money payload
+            checkoutPayload = {
+                provider: paymentMethod,
+                merchantAccountNumber: process.env.AZAMPAY_ACCOUNT_NUMBER,
+                merchantName: "TanzaFlix",
+                merchantMobileNumber: phoneNumber,
+                currencyCode: "TZS",
+                amount: plan.price.toString(),
+                referenceId: paymentReference,
+                merchantReferenceId: paymentReference,
+                additionalProperties: {
+                    provider: paymentMethod
+                },
+                source: "TanzaFlix"
+            };
+        }
+
+        console.log("Sending AzamPay payload:", JSON.stringify(checkoutPayload, null, 2));
 
         const checkoutResponse = await azampay.createCheckout(checkoutPayload);
 
@@ -83,9 +161,27 @@ exports.createPayment = async (req, res) => {
 
     } catch (err) {
         console.log("Payment Error:", err.response?.data || err.message);
-        res.status(500).json({
+        
+        // Handle specific AzamPay errors
+        let errorMessage = err.message;
+        let errorCode = null;
+        
+        if (err.response?.data) {
+            errorMessage = err.response.data.message || err.response.data.error || err.message;
+            errorCode = err.response.data.code || err.response.status;
+        } else if (err.message === 'read ECONNRESET') {
+            errorMessage = "Connection to payment gateway failed. Please try again or use a different payment method.";
+        } else if (err.message.includes('404')) {
+            errorMessage = "Payment provider not supported. Please use mobile money (M-Pesa, Airtel Money, or Mix by Yas).";
+        }
+        
+        res.status(err.response?.status || 500).json({
             success: false,
-            message: err.response?.data || err.message
+            message: errorMessage,
+            code: errorCode,
+            suggestion: paymentMethod === 'bank_card' ? 
+                "Bank card payments may not be supported in sandbox. Try using mobile money." : 
+                "Please check your payment details and try again."
         });
     }
 };
@@ -105,6 +201,7 @@ exports.getPaymentStatus = async (req, res) => {
                 status, 
                 payment_method,
                 phone_number,
+                account_name,
                 paid_at,
                 created_at,
                 gateway_transaction_id
@@ -126,7 +223,7 @@ exports.getPaymentStatus = async (req, res) => {
         });
 
     } catch (error) {
-        console.error(error);
+        console.error("Get Payment Status Error:", error);
         res.status(500).json({
             success: false,
             message: "Failed to get payment status"
@@ -147,6 +244,8 @@ exports.getPaymentHistory = async (req, res) => {
                 p.currency,
                 p.status,
                 p.payment_method,
+                p.phone_number,
+                p.account_name,
                 p.paid_at,
                 p.created_at,
                 pl.name as plan_name,
@@ -165,7 +264,7 @@ exports.getPaymentHistory = async (req, res) => {
         });
 
     } catch (error) {
-        console.error(error);
+        console.error("Get Payment History Error:", error);
         res.status(500).json({
             success: false,
             message: "Failed to get payment history"
@@ -373,7 +472,7 @@ exports.adminGetAllPayments = async (req, res) => {
         });
 
     } catch (error) {
-        console.error(error);
+        console.error("Admin Get Payments Error:", error);
         res.status(500).json({
             success: false,
             message: "Failed to fetch payments"
@@ -416,7 +515,7 @@ exports.adminGetPaymentStats = async (req, res) => {
         });
 
     } catch (error) {
-        console.error(error);
+        console.error("Admin Get Payment Stats Error:", error);
         res.status(500).json({
             success: false,
             message: "Failed to fetch payment stats"

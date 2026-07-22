@@ -53,13 +53,16 @@ const getAccessToken = async () => {
             }
         );
 
-        if (!response.data || !response.data.accessToken) {
+        // FIX: Access token is nested under response.data.data.accessToken
+        const accessToken = response.data?.data?.accessToken;
+        
+        if (!accessToken) {
             console.log("AzamPay Token Response:", response.data);
             throw new Error("AzamPay token not returned");
         }
 
         console.log("AzamPay Token Generated Successfully");
-        return response.data.accessToken;
+        return accessToken;
 
     } catch (error) {
         console.log("========== AZAMPAY AUTH ERROR ==========");
