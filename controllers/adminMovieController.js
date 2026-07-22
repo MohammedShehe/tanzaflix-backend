@@ -1,4 +1,3 @@
-// controllers/adminMovieController.js
 const db = require("../config/db");
 const cloudinary = require("../config/cloudinary");
 
@@ -15,6 +14,7 @@ exports.createMovie = async (req, res) => {
             country,
             language,
             category,
+            is_translated,
             year,
             price,
             description,
@@ -103,7 +103,7 @@ exports.createMovie = async (req, res) => {
             }
         }
 
-        // Insert movie
+        // Insert movie with is_translated field
         const [movieResult] = await connection.query(
             `INSERT INTO movies (
                 title,
@@ -111,6 +111,7 @@ exports.createMovie = async (req, res) => {
                 country,
                 language,
                 category,
+                is_translated,
                 year,
                 price,
                 description,
@@ -119,13 +120,14 @@ exports.createMovie = async (req, res) => {
                 video,
                 video_public_id,
                 movie_time
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 title,
                 movie_type,
                 country,
                 language,
                 category,
+                is_translated === 'true' || is_translated === true || is_translated === 1 ? 1 : 0,
                 year,
                 price,
                 description || null,
@@ -304,6 +306,7 @@ exports.getMovies = async (req, res) => {
                 country,
                 language,
                 category,
+                is_translated,
                 year,
                 price,
                 description,
@@ -382,6 +385,7 @@ exports.getMovies = async (req, res) => {
         const formattedMovies = movies.map(movie => {
             const movieData = {
                 ...movie,
+                is_translated: Boolean(movie.is_translated),
                 more_like_this: recommendationMap[movie.id] || []
             };
 
@@ -418,6 +422,7 @@ exports.getMovie = async (req, res) => {
                 country,
                 language,
                 category,
+                is_translated,
                 year,
                 price,
                 description,
@@ -440,6 +445,7 @@ exports.getMovie = async (req, res) => {
         }
 
         const movie = rows[0];
+        movie.is_translated = Boolean(movie.is_translated);
 
         const [related] = await db.query(
             `SELECT
@@ -539,6 +545,7 @@ exports.updateMovie = async (req, res) => {
             country,
             language,
             category,
+            is_translated,
             year,
             price,
             description,
@@ -591,6 +598,7 @@ exports.updateMovie = async (req, res) => {
                 country = ?,
                 language = ?,
                 category = ?,
+                is_translated = ?,
                 year = ?,
                 price = ?,
                 description = ?,
@@ -606,6 +614,7 @@ exports.updateMovie = async (req, res) => {
                 country,
                 language,
                 category,
+                is_translated === 'true' || is_translated === true || is_translated === 1 ? 1 : 0,
                 year,
                 price,
                 description || null,
@@ -776,6 +785,15 @@ exports.getMovieStats = async (req, res) => {
              ORDER BY year DESC`
         );
 
+        // Get movies by translation status
+        const [moviesByTranslation] = await db.query(
+            `SELECT 
+                is_translated,
+                COUNT(*) as count
+             FROM movies
+             GROUP BY is_translated`
+        );
+
         // Get total seasons and episodes for series
         const [seriesStats] = await db.query(
             `SELECT 
@@ -823,6 +841,10 @@ exports.getMovieStats = async (req, res) => {
             movies_by_category: moviesByCategory,
             movies_by_country: moviesByCountry,
             movies_by_year: moviesByYear,
+            movies_by_translation: moviesByTranslation.map(t => ({
+                translated: Boolean(t.is_translated),
+                count: t.count
+            })),
             series_stats: {
                 total_seasons: seriesStats[0]?.total_seasons || 0,
                 total_episodes: seriesStats[0]?.total_episodes || 0

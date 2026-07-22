@@ -1,4 +1,3 @@
-// controllers/userMovieController.js
 const db = require("../config/db");
 const { logMovieAccess } = require("../middleware/movieAccessMiddleware");
 
@@ -51,9 +50,9 @@ const getMovieRatingInfo = async (movieId, userId = null) => {
                 review_text: userRating[0].review_text,
                 created_at: userRating[0].created_at
             } : null;
-            ratingInfo.can_rate = !(userRating.length > 0); // Can only rate if not already rated
-            ratingInfo.can_edit = false; // No editing allowed
-            ratingInfo.can_rerate = false; // No re-rating allowed
+            ratingInfo.can_rate = !(userRating.length > 0);
+            ratingInfo.can_edit = false;
+            ratingInfo.can_rerate = false;
         }
 
         return ratingInfo;
@@ -84,6 +83,7 @@ exports.getMovies = async (req, res) => {
                 country,
                 language,
                 category,
+                is_translated,
                 year,
                 price,
                 description,
@@ -155,7 +155,6 @@ exports.getMovies = async (req, res) => {
                     episode_number: item.episode_number,
                     episode_title: item.episode_title,
                     duration: item.duration
-                    // video_url hidden - will be shown only on access check
                 });
             }
         });
@@ -193,6 +192,7 @@ exports.getMovies = async (req, res) => {
 
             const movieData = {
                 ...movie,
+                is_translated: Boolean(movie.is_translated),
                 more_like_this: recommendationMap[movie.id] || [],
                 canWatch: hasSubscription || purchasedMovieIds.includes(movie.id),
                 hasSubscription: hasSubscription,
@@ -251,6 +251,7 @@ exports.getMovie = async (req, res) => {
                 country,
                 language,
                 category,
+                is_translated,
                 year,
                 price,
                 description,
@@ -273,6 +274,7 @@ exports.getMovie = async (req, res) => {
         }
 
         const movie = rows[0];
+        movie.is_translated = Boolean(movie.is_translated);
 
         // Get recommendations
         const [related] = await db.query(
@@ -350,7 +352,6 @@ exports.getMovie = async (req, res) => {
 
         // If can watch, include video URL
         if (canWatch) {
-            // Log the access
             await logMovieAccess(userId, movieId, null, accessType);
         }
 
@@ -391,7 +392,6 @@ exports.getMovie = async (req, res) => {
                         duration: item.duration
                     };
                     
-                    // Only include video URL if can watch
                     if (canWatch) {
                         episodeData.video_url = item.video_url;
                     }
@@ -449,13 +449,12 @@ exports.getMovie = async (req, res) => {
     }
 };
 
-// NEW: Mark episode as completed (for tracking free trial)
+// MARK: Mark episode as completed (for tracking free trial)
 exports.markEpisodeComplete = async (req, res) => {
     try {
         const userId = req.user.id;
         const { movieId, episodeId, duration, totalDuration } = req.body;
 
-        // Validate required fields
         if (!movieId || !episodeId) {
             return res.status(400).json({
                 success: false,
@@ -463,7 +462,6 @@ exports.markEpisodeComplete = async (req, res) => {
             });
         }
 
-        // Check if this was a free trial access
         const [accessLog] = await db.query(
             `SELECT id, access_type, completed FROM movie_access_logs 
              WHERE user_id = ? AND movie_id = ? AND episode_id = ? 
@@ -473,13 +471,10 @@ exports.markEpisodeComplete = async (req, res) => {
         );
 
         if (accessLog.length > 0 && accessLog[0].access_type === 'free_trial') {
-            // Only update if not already completed
             if (!accessLog[0].completed) {
-                // Check if user watched enough
                 const watchedEnough = hasWatchedEnough(duration || 0, totalDuration || 0);
                 
                 if (watchedEnough) {
-                    // Mark user as having watched for the first time
                     await db.query(
                         `UPDATE users SET 
                          has_watched_before = TRUE,
@@ -488,7 +483,6 @@ exports.markEpisodeComplete = async (req, res) => {
                         [userId]
                     );
                     
-                    // Mark the access log as completed
                     await db.query(
                         `UPDATE movie_access_logs 
                          SET completed = TRUE, watched_duration = ?
@@ -498,7 +492,6 @@ exports.markEpisodeComplete = async (req, res) => {
                     
                     console.log(`User ${userId} completed free trial for episode ${episodeId} of movie ${movieId}`);
                 } else {
-                    // Update watched duration but don't mark as completed
                     await db.query(
                         `UPDATE movie_access_logs 
                          SET watched_duration = ?
@@ -508,7 +501,6 @@ exports.markEpisodeComplete = async (req, res) => {
                 }
             }
         } else {
-            // Not a free trial, just log the progress
             await db.query(
                 `INSERT INTO movie_access_logs 
                  (user_id, movie_id, episode_id, access_type, completed, watched_duration) 
@@ -531,13 +523,12 @@ exports.markEpisodeComplete = async (req, res) => {
     }
 };
 
-// NEW: Mark single movie as completed
+// MARK: Mark single movie as completed
 exports.markMovieComplete = async (req, res) => {
     try {
         const userId = req.user.id;
         const { movieId, duration, totalDuration } = req.body;
 
-        // Validate required fields
         if (!movieId) {
             return res.status(400).json({
                 success: false,
@@ -545,7 +536,6 @@ exports.markMovieComplete = async (req, res) => {
             });
         }
 
-        // Check if this was a free trial access
         const [accessLog] = await db.query(
             `SELECT id, access_type, completed FROM movie_access_logs 
              WHERE user_id = ? AND movie_id = ? 
@@ -556,13 +546,10 @@ exports.markMovieComplete = async (req, res) => {
         );
 
         if (accessLog.length > 0 && accessLog[0].access_type === 'free_trial') {
-            // Only update if not already completed
             if (!accessLog[0].completed) {
-                // Check if user watched enough
                 const watchedEnough = hasWatchedEnough(duration || 0, totalDuration || 0);
                 
                 if (watchedEnough) {
-                    // Mark user as having watched for the first time
                     await db.query(
                         `UPDATE users SET 
                          has_watched_before = TRUE,
@@ -571,7 +558,6 @@ exports.markMovieComplete = async (req, res) => {
                         [userId]
                     );
                     
-                    // Mark the access log as completed
                     await db.query(
                         `UPDATE movie_access_logs 
                          SET completed = TRUE, watched_duration = ?
@@ -581,7 +567,6 @@ exports.markMovieComplete = async (req, res) => {
                     
                     console.log(`User ${userId} completed free trial for movie ${movieId}`);
                 } else {
-                    // Update watched duration but don't mark as completed
                     await db.query(
                         `UPDATE movie_access_logs 
                          SET watched_duration = ?
@@ -591,7 +576,6 @@ exports.markMovieComplete = async (req, res) => {
                 }
             }
         } else {
-            // Not a free trial, just log the progress
             await db.query(
                 `INSERT INTO movie_access_logs 
                  (user_id, movie_id, episode_id, access_type, completed, watched_duration) 
@@ -614,7 +598,7 @@ exports.markMovieComplete = async (req, res) => {
     }
 };
 
-// NEW: Get user's watch history
+// MARK: Get user's watch history
 exports.getWatchHistory = async (req, res) => {
     try {
         const userId = req.user.id;
