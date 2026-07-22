@@ -10,23 +10,23 @@ const transporter = nodemailer.createTransport({
 
 const sendOTP = async (email, otp, type = 'login') => {
     // Determine email content based on type
-    let subject, title, message, buttonText;
+    let subject, title, message, thankYouMessage;
     
     if (type === 'login') {
         subject = "🔐 TanzaFlix - Admin Login Verification";
         title = "Admin Login Verification";
         message = "Please use the verification code below to complete your admin login.";
-        buttonText = "Verify Login";
+        thankYouMessage = "Thank you for choosing TanzaFlix. Your security is our priority.";
     } else if (type === 'reset') {
         subject = "🔑 TanzaFlix - Password Reset";
         title = "Password Reset Request";
         message = "You requested to reset your password. Use the verification code below to proceed.";
-        buttonText = "Reset Password";
+        thankYouMessage = "Thank you for choosing TanzaFlix. Your security is our priority.";
     } else {
         subject = "🔐 TanzaFlix - Verification Code";
         title = "Verification Code";
         message = "Please use the verification code below to complete your action.";
-        buttonText = "Verify";
+        thankYouMessage = "Thank you for choosing TanzaFlix. Your security is our priority.";
     }
 
     const htmlContent = `
@@ -179,28 +179,33 @@ const sendOTP = async (email, otp, type = 'login') => {
                 color: #1a1a2e;
             }
             
-            /* Button */
-            .btn-container {
+            /* Thank You Message */
+            .thankyou-container {
                 text-align: center;
-                margin-bottom: 28px;
+                padding: 20px;
+                margin-bottom: 20px;
+                border-radius: 12px;
+                background: linear-gradient(135deg, #f0f4ff 0%, #faf0ff 100%);
+                border: 1px solid #e8edff;
             }
             
-            .btn {
-                display: inline-block;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: #ffffff;
-                padding: 14px 42px;
-                border-radius: 30px;
-                font-weight: 600;
-                font-size: 16px;
-                text-decoration: none;
-                box-shadow: 0 4px 15px rgba(102, 126, 234, 0.35);
-                transition: transform 0.2s, box-shadow 0.2s;
+            .thankyou-icon {
+                font-size: 36px;
+                display: block;
+                margin-bottom: 10px;
             }
             
-            .btn:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 6px 20px rgba(102, 126, 234, 0.45);
+            .thankyou-text {
+                color: #4a4a6a;
+                font-size: 15px;
+                font-weight: 500;
+                margin: 0;
+            }
+            
+            .thankyou-subtext {
+                color: #8888aa;
+                font-size: 13px;
+                margin-top: 6px;
             }
             
             /* Footer */
@@ -288,11 +293,6 @@ const sendOTP = async (email, otp, type = 'login') => {
                     padding: 6px 14px;
                 }
                 
-                .btn {
-                    padding: 12px 28px;
-                    font-size: 14px;
-                }
-                
                 .footer {
                     padding: 20px;
                 }
@@ -328,9 +328,11 @@ const sendOTP = async (email, otp, type = 'login') => {
                     <p>💡 <strong>Tip:</strong> If you didn't request this code, please ignore this email. Your account is secure.</p>
                 </div>
                 
-                <!-- Action Button -->
-                <div class="btn-container">
-                    <a href="#" class="btn">${buttonText}</a>
+                <!-- Thank You Message (replaces button) -->
+                <div class="thankyou-container">
+                    <span class="thankyou-icon">🙏</span>
+                    <p class="thankyou-text">${thankYouMessage}</p>
+                    <p class="thankyou-subtext">Please enter the verification code above to continue.</p>
                 </div>
                 
                 <!-- Security Notice -->
