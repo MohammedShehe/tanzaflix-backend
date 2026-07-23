@@ -3,7 +3,6 @@ const { logMovieAccess } = require("../middleware/movieAccessMiddleware");
 
 // Helper function to determine if user watched enough
 const hasWatchedEnough = (watchedDuration, totalDuration) => {
-    // Minimum 30% of the movie OR at least 5 minutes (300 seconds)
     if (!totalDuration || totalDuration === 0) return false;
     const percentage = (watchedDuration / totalDuration) * 100;
     return percentage >= 30 || watchedDuration >= 300;
@@ -12,7 +11,6 @@ const hasWatchedEnough = (watchedDuration, totalDuration) => {
 // Helper function to get movie rating info
 const getMovieRatingInfo = async (movieId, userId = null) => {
     try {
-        // Get movie rating stats
         const [movieRating] = await db.query(
             `SELECT 
                 avg_rating,
@@ -30,7 +28,6 @@ const getMovieRatingInfo = async (movieId, userId = null) => {
                 "Not rated yet"
         };
 
-        // If userId provided, check if user has rated this movie
         if (userId) {
             const [userRating] = await db.query(
                 `SELECT 
@@ -68,6 +65,43 @@ const getMovieRatingInfo = async (movieId, userId = null) => {
             can_edit: false,
             can_rerate: false
         };
+    }
+};
+
+// Helper: Check if user has a valid purchase for this movie
+const hasValidMoviePurchase = async (userId, movieId) => {
+    try {
+        // Check for completed purchase (active or not expired)
+        const [rows] = await db.query(
+            `SELECT id, status, expires_at FROM movie_purchases 
+             WHERE user_id = ? AND movie_id = ? 
+             AND status IN ('completed', 'paid')
+             AND (expires_at IS NULL OR expires_at > NOW())
+             LIMIT 1`,
+            [userId, movieId]
+        );
+        
+        if (rows.length > 0) {
+            return { valid: true, purchase: rows[0] };
+        }
+        
+        // Check for pending/processing purchase that might not be completed yet
+        const [pendingRows] = await db.query(
+            `SELECT id, status FROM movie_purchases 
+             WHERE user_id = ? AND movie_id = ? 
+             AND status IN ('pending', 'processing')
+             LIMIT 1`,
+            [userId, movieId]
+        );
+        
+        if (pendingRows.length > 0) {
+            return { valid: false, status: pendingRows[0].status, message: "Purchase is being processed" };
+        }
+        
+        return { valid: false, purchase: null };
+    } catch (error) {
+        console.error("Error checking purchase:", error);
+        return { valid: false, purchase: null };
     }
 };
 
@@ -159,7 +193,7 @@ exports.getMovies = async (req, res) => {
             }
         });
 
-        // Get user's access status
+        // Get user's subscription status
         const [subscription] = await db.query(
             `SELECT id, expires_at FROM subscriptions 
              WHERE user_id = ? AND status = 'active' AND expires_at > NOW()
@@ -168,14 +202,20 @@ exports.getMovies = async (req, res) => {
         );
         const hasSubscription = subscription.length > 0;
 
-        // Get user's purchased movies
+        // Get user's purchased movies (check all possible statuses)
         const [purchases] = await db.query(
-            `SELECT movie_id FROM movie_purchases 
-             WHERE user_id = ? AND status = 'completed' 
-             AND (expires_at IS NULL OR expires_at > NOW())`,
+            `SELECT movie_id, status FROM movie_purchases 
+             WHERE user_id = ? 
+             AND status IN ('completed', 'paid', 'pending', 'processing')
+             AND (expires_at IS NULL OR expires_at > NOW())
+             GROUP BY movie_id`,
             [userId]
         );
+        
         const purchasedMovieIds = purchases.map(p => p.movie_id);
+        const pendingMovieIds = purchases
+            .filter(p => p.status === 'pending' || p.status === 'processing')
+            .map(p => p.movie_id);
 
         // Check if first time
         const [userData] = await db.query(
@@ -187,16 +227,20 @@ exports.getMovies = async (req, res) => {
         // Get rating for each movie and check if user has rated
         const formattedMovies = [];
         for (const movie of movies) {
-            // Get rating info for this movie
             const ratingInfo = await getMovieRatingInfo(movie.id, userId);
+            
+            // Check if this specific movie is purchased
+            const isPurchased = purchasedMovieIds.includes(movie.id);
+            const isPending = pendingMovieIds.includes(movie.id);
 
             const movieData = {
                 ...movie,
                 is_translated: Boolean(movie.is_translated),
                 more_like_this: recommendationMap[movie.id] || [],
-                canWatch: hasSubscription || purchasedMovieIds.includes(movie.id),
+                canWatch: hasSubscription || isPurchased,
                 hasSubscription: hasSubscription,
-                isPurchased: purchasedMovieIds.includes(movie.id),
+                isPurchased: isPurchased,
+                isPending: isPending,
                 isFirstTime: isFirstTime,
                 rating: {
                     average: ratingInfo.average,
@@ -214,7 +258,6 @@ exports.getMovies = async (req, res) => {
                 movieData.seasons = Object.values(seasonsMap[movie.id]);
             }
 
-            // Remove video_url from listing - only show in single view with access
             delete movieData.video;
 
             formattedMovies.push(movieData);
@@ -298,15 +341,26 @@ exports.getMovie = async (req, res) => {
         );
         const hasSubscription = subscription.length > 0;
 
+        // CRITICAL FIX: Check for ANY purchase status (not just completed)
         const [purchase] = await db.query(
-            `SELECT id FROM movie_purchases 
+            `SELECT id, status, expires_at FROM movie_purchases 
              WHERE user_id = ? AND movie_id = ? 
-             AND status = 'completed' 
              AND (expires_at IS NULL OR expires_at > NOW())
+             ORDER BY 
+                CASE status 
+                    WHEN 'completed' THEN 1
+                    WHEN 'paid' THEN 2
+                    WHEN 'processing' THEN 3
+                    WHEN 'pending' THEN 4
+                    ELSE 5
+                END
              LIMIT 1`,
             [userId, movieId]
         );
+        
         const hasPurchased = purchase.length > 0;
+        const purchaseStatus = hasPurchased ? purchase[0].status : null;
+        const isPurchasePending = hasPurchased && ['pending', 'processing'].includes(purchaseStatus);
 
         const [userData] = await db.query(
             `SELECT has_watched_before FROM users WHERE id = ?`,
@@ -323,10 +377,15 @@ exports.getMovie = async (req, res) => {
             canWatch = true;
             accessType = 'subscription';
             accessMessage = "You have an active subscription";
-        } else if (hasPurchased) {
+        } else if (hasPurchased && !isPurchasePending) {
             canWatch = true;
             accessType = 'paid_single';
             accessMessage = "You have purchased this movie";
+        } else if (isPurchasePending) {
+            // Still pending - show paywall but with pending message
+            canWatch = false;
+            accessType = 'pending_purchase';
+            accessMessage = "Your purchase is being processed. Please wait or try again.";
         } else if (isFirstTime) {
             // Check if already used free trial on this movie (completed)
             const [trialUsed] = await db.query(
@@ -421,6 +480,8 @@ exports.getMovie = async (req, res) => {
                 accessMessage,
                 hasSubscription,
                 hasPurchased,
+                isPurchasePending,
+                purchaseStatus,
                 isFirstTime,
                 rating: {
                     average: ratingInfo.average,
@@ -449,7 +510,7 @@ exports.getMovie = async (req, res) => {
     }
 };
 
-// MARK: Mark episode as completed (for tracking free trial)
+// MARK: Mark episode as completed
 exports.markEpisodeComplete = async (req, res) => {
     try {
         const userId = req.user.id;

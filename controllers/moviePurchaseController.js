@@ -24,19 +24,48 @@ exports.createMoviePurchase = async (req, res) => {
 
         const movie = movies[0];
 
-        // Check if already purchased
+        // CHECK: If user already has a valid purchase (completed/paid)
         const [existing] = await db.query(
-            `SELECT id, status FROM movie_purchases 
+            `SELECT id, status, expires_at FROM movie_purchases 
              WHERE user_id = ? AND movie_id = ? 
-             AND status = 'completed' 
-             AND (expires_at IS NULL OR expires_at > NOW())`,
+             AND status IN ('completed', 'paid')
+             AND (expires_at IS NULL OR expires_at > NOW())
+             LIMIT 1`,
             [userId, movieId]
         );
 
         if (existing.length > 0) {
             return res.status(400).json({
                 success: false,
-                message: "You already have access to this movie"
+                code: 'ALREADY_PURCHASED',
+                message: "You already have access to this movie",
+                purchase: {
+                    id: existing[0].id,
+                    status: existing[0].status,
+                    expires_at: existing[0].expires_at
+                }
+            });
+        }
+
+        // CHECK: If user has a pending purchase (being processed)
+        const [pending] = await db.query(
+            `SELECT id, status, created_at FROM movie_purchases 
+             WHERE user_id = ? AND movie_id = ? 
+             AND status IN ('pending', 'processing')
+             LIMIT 1`,
+            [userId, movieId]
+        );
+
+        if (pending.length > 0) {
+            return res.status(400).json({
+                success: false,
+                code: 'PENDING_PURCHASE',
+                message: "You already have a pending purchase for this movie",
+                purchase: {
+                    id: pending[0].id,
+                    status: pending[0].status,
+                    created_at: pending[0].created_at
+                }
             });
         }
 
@@ -65,7 +94,6 @@ exports.createMoviePurchase = async (req, res) => {
                     required: ['cardNumber', 'expiryDate', 'cvv']
                 });
             }
-            // Validate card number format
             const cleanCard = cardNumber.replace(/\s/g, '');
             if (!/^\d{13,19}$/.test(cleanCard)) {
                 return res.status(400).json({
@@ -73,7 +101,6 @@ exports.createMoviePurchase = async (req, res) => {
                     message: "Invalid card number. Must be 13-19 digits."
                 });
             }
-            // Validate expiry date format
             const cleanExpiry = expiryDate.replace(/\s/g, '');
             if (!/^\d{2}\/\d{2}$/.test(cleanExpiry) && !/^\d{4}$/.test(cleanExpiry)) {
                 return res.status(400).json({
@@ -81,7 +108,6 @@ exports.createMoviePurchase = async (req, res) => {
                     message: "Invalid expiry date format. Use MM/YY or MMYY."
                 });
             }
-            // Validate CVV
             if (!/^\d{3,4}$/.test(cvv)) {
                 return res.status(400).json({
                     success: false,
@@ -129,7 +155,6 @@ exports.createMoviePurchase = async (req, res) => {
         let checkoutPayload;
 
         if (paymentMethod === 'bank_card') {
-            // Bank card payload
             checkoutPayload = {
                 provider: "CARD",
                 merchantAccountNumber: process.env.AZAMPAY_ACCOUNT_NUMBER,
@@ -151,7 +176,6 @@ exports.createMoviePurchase = async (req, res) => {
                 source: "TanzaFlix"
             };
         } else {
-            // Mobile money payload
             checkoutPayload = {
                 provider: paymentMethod,
                 merchantAccountNumber: process.env.AZAMPAY_ACCOUNT_NUMBER,
@@ -201,6 +225,36 @@ exports.createMoviePurchase = async (req, res) => {
     } catch (err) {
         console.error("Movie Purchase Error:", err);
         
+        // Handle duplicate entry error gracefully
+        if (err.code === 'ER_DUP_ENTRY' || (err.message && err.message.includes('Duplicate entry'))) {
+            // Check if the user actually has a valid purchase
+            try {
+                const [existingPurchase] = await db.query(
+                    `SELECT id, status, expires_at FROM movie_purchases 
+                     WHERE user_id = ? AND movie_id = ? 
+                     AND status IN ('completed', 'paid', 'pending', 'processing')
+                     LIMIT 1`,
+                    [req.user.id, req.params.id]
+                );
+                
+                if (existingPurchase.length > 0) {
+                    return res.status(400).json({
+                        success: false,
+                        code: 'ALREADY_PURCHASED',
+                        message: "You already have a purchase record for this movie",
+                        purchase: {
+                            id: existingPurchase[0].id,
+                            status: existingPurchase[0].status,
+                            expires_at: existingPurchase[0].expires_at
+                        },
+                        canWatch: existingPurchase[0].status === 'completed' || existingPurchase[0].status === 'paid'
+                    });
+                }
+            } catch (checkError) {
+                console.error("Error checking existing purchase:", checkError);
+            }
+        }
+        
         // Handle specific AzamPay errors
         let errorMessage = err.message;
         if (err.response?.data?.message) {
@@ -211,7 +265,8 @@ exports.createMoviePurchase = async (req, res) => {
         
         res.status(500).json({
             success: false,
-            message: errorMessage
+            message: errorMessage,
+            code: err.code || 'PAYMENT_ERROR'
         });
     }
 };
@@ -251,7 +306,6 @@ exports.verifyPurchase = async (req, res) => {
 
         // If payment is completed but purchase not updated
         if (payment.status === 'paid' && payment.purchase_status !== 'completed') {
-            // Update purchase
             await db.query(
                 `UPDATE movie_purchases 
                  SET status = 'completed', 
@@ -302,9 +356,7 @@ exports.handlePurchaseCallback = async (req, res) => {
             operator
         } = req.body;
 
-        // ============================
-        // FIND PAYMENT
-        // ============================
+        // Find payment
         const [payments] = await db.query(
             `SELECT p.*, mp.id as purchase_id 
              FROM payments p
@@ -323,9 +375,7 @@ exports.handlePurchaseCallback = async (req, res) => {
 
         const payment = payments[0];
 
-        // ============================
-        // IDEMPOTENCY - PREVENT DOUBLE PROCESSING
-        // ============================
+        // Idempotency - prevent double processing
         if (payment.status === 'paid') {
             console.log("Payment already processed:", initiatorReferenceId);
             return res.json({ 
@@ -334,9 +384,7 @@ exports.handlePurchaseCallback = async (req, res) => {
             });
         }
 
-        // ============================
-        // DETERMINE PAYMENT STATUS
-        // ============================
+        // Determine payment status
         let paymentStatus = (status || '').toLowerCase();
         if (paymentStatus === "success" || paymentStatus === "completed") {
             paymentStatus = "paid";
@@ -344,9 +392,7 @@ exports.handlePurchaseCallback = async (req, res) => {
             paymentStatus = "failed";
         }
 
-        // ============================
-        // UPDATE PAYMENT
-        // ============================
+        // Update payment
         await db.query(
             `UPDATE payments 
              SET 
@@ -364,9 +410,7 @@ exports.handlePurchaseCallback = async (req, res) => {
             ]
         );
 
-        // ============================
-        // IF PAID - UPDATE PURCHASE & ACTIVATE ACCESS
-        // ============================
+        // If PAID - update purchase & activate access
         if (paymentStatus === 'paid' && payment.purchase_id) {
             // Update purchase status
             await db.query(
@@ -377,7 +421,7 @@ exports.handlePurchaseCallback = async (req, res) => {
                 [payment.purchase_id]
             );
 
-            // Log access (optional - for tracking)
+            // Log access
             await db.query(
                 `INSERT INTO movie_access_logs 
                  (user_id, movie_id, access_type, completed) 
