@@ -1,3 +1,4 @@
+// routes/adminUserRoutes.js
 const router = require("express").Router();
 const upload = require("../middleware/upload");
 const {
@@ -7,6 +8,8 @@ const {
 const controller = require("../controllers/adminUserController");
 
 // ==================== STATS ROUTE ====================
+// Get user statistics (dashboard stats)
+// IMPORTANT: This MUST come before the /:id route to avoid conflicts
 router.get(
     "/stats",
     authenticate,

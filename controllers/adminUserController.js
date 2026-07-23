@@ -1,3 +1,4 @@
+// controllers/adminUserController.js
 const db = require("../config/db");
 const bcrypt = require("bcrypt");
 const cloudinary = require("../config/cloudinary");
