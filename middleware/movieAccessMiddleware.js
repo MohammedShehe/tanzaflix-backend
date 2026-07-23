@@ -92,12 +92,34 @@ const logMovieAccess = async (userId, movieId, episodeId, accessType, completed 
     }
 
     try {
-        await db.query(
-            `INSERT INTO movie_access_logs 
-             (user_id, movie_id, episode_id, access_type, completed, watched_duration) 
-             VALUES (?, ?, ?, ?, ?, ?)`,
-            [userId, movieId, episodeId, accessType, completed ? 1 : 0, duration]
+        // Check if there's already a recent log for this user/movie/episode
+        const [existing] = await db.query(
+            `SELECT id, watched_duration FROM movie_access_logs 
+             WHERE user_id = ? AND movie_id = ? AND (episode_id = ? OR (episode_id IS NULL AND ? IS NULL))
+             AND access_type = ?
+             ORDER BY id DESC LIMIT 1`,
+            [userId, movieId, episodeId || null, episodeId || null, accessType]
         );
+
+        if (existing.length > 0) {
+            // Update existing log with latest duration
+            await db.query(
+                `UPDATE movie_access_logs 
+                 SET watched_duration = ?, 
+                     completed = ?,
+                     created_at = NOW()
+                 WHERE id = ?`,
+                [duration, completed ? 1 : 0, existing[0].id]
+            );
+        } else {
+            // Insert new log
+            await db.query(
+                `INSERT INTO movie_access_logs 
+                 (user_id, movie_id, episode_id, access_type, completed, watched_duration) 
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                [userId, movieId, episodeId, accessType, completed ? 1 : 0, duration]
+            );
+        }
     } catch (error) {
         console.error("Error logging movie access:", error.message);
     }
