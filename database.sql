@@ -34,7 +34,7 @@ CREATE TABLE `episodes` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `unique_episode` (`season_id`,`episode_number`),
   CONSTRAINT `episodes_ibfk_1` FOREIGN KEY (`season_id`) REFERENCES `seasons` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -43,7 +43,7 @@ CREATE TABLE `episodes` (
 
 LOCK TABLES `episodes` WRITE;
 /*!40000 ALTER TABLE `episodes` DISABLE KEYS */;
-INSERT INTO `episodes` VALUES (1,1,1,'Pilot','https://res.cloudinary.com/dlokcqf1h/video/upload/v1784591536/movies/episodes/o8ogu3rr2v0lsp5nocuv.mp4','movies/episodes/o8ogu3rr2v0lsp5nocuv','58m','2026-07-20 23:52:24'),(2,1,2,'Cat\'s in the Bag...','https://res.cloudinary.com/dlokcqf1h/video/upload/v1784591540/movies/episodes/qgmggokxbmz8x0wjtvkb.mp4','movies/episodes/qgmggokxbmz8x0wjtvkb','48m','2026-07-20 23:52:24'),(3,1,3,'...And the Bag\'s in the River','https://res.cloudinary.com/dlokcqf1h/video/upload/v1784591540/movies/episodes/minsdgc8agwk3wumjpkj.mp4','movies/episodes/minsdgc8agwk3wumjpkj','48m','2026-07-20 23:52:24'),(4,2,1,'Seven Thirty-Seven','https://res.cloudinary.com/dlokcqf1h/video/upload/v1784591540/movies/episodes/jywxdpt6en72xhgwkfxf.mp4','movies/episodes/jywxdpt6en72xhgwkfxf','47m','2026-07-20 23:52:24'),(5,2,2,'Grilled','https://res.cloudinary.com/dlokcqf1h/video/upload/v1784591544/movies/episodes/czafp1tz5vc3iuq94mwh.mp4','movies/episodes/czafp1tz5vc3iuq94mwh','48m','2026-07-20 23:52:24'),(6,2,3,'Bit by a Dead Bee','https://res.cloudinary.com/dlokcqf1h/video/upload/v1784591544/movies/episodes/iff47to4oar5l9jcnyf4.mp4','movies/episodes/iff47to4oar5l9jcnyf4','47m','2026-07-20 23:52:24');
+INSERT INTO `episodes` VALUES (7,4,1,'Episode 1','https://res.cloudinary.com/dlokcqf1h/video/upload/v1784759757/movies/episodes/ukaohsfeih8fbkki4jgt.mp4','movies/episodes/ukaohsfeih8fbkki4jgt','1m','2026-07-22 22:36:03'),(8,4,2,'Episode 2','https://res.cloudinary.com/dlokcqf1h/video/upload/v1784759761/movies/episodes/e7wbu9mmkpqhb5oaugtd.mp4','movies/episodes/e7wbu9mmkpqhb5oaugtd','1m','2026-07-22 22:36:03'),(9,5,1,'Episode 1','https://res.cloudinary.com/dlokcqf1h/video/upload/v1784759766/movies/episodes/bhuuq3mxnli9jpporpwe.mp4','movies/episodes/bhuuq3mxnli9jpporpwe','1m','2026-07-22 22:36:03');
 /*!40000 ALTER TABLE `episodes` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -117,7 +117,6 @@ CREATE TABLE `movie_access_logs` (
 
 LOCK TABLES `movie_access_logs` WRITE;
 /*!40000 ALTER TABLE `movie_access_logs` DISABLE KEYS */;
-INSERT INTO `movie_access_logs` VALUES (1,4,2,NULL,'denied',0,0,'2026-07-20 23:54:53'),(2,4,2,NULL,'free_trial',0,0,'2026-07-21 00:02:55'),(3,4,2,NULL,'free_trial',0,0,'2026-07-21 00:02:55'),(4,4,2,NULL,'free_trial',0,0,'2026-07-22 00:59:28'),(5,4,2,NULL,'free_trial',0,0,'2026-07-22 00:59:28'),(6,4,2,NULL,'free_trial',0,0,'2026-07-22 01:02:04'),(7,4,2,NULL,'free_trial',0,0,'2026-07-22 01:02:04'),(8,4,1,NULL,'free_trial',0,0,'2026-07-22 01:02:15'),(9,4,1,NULL,'free_trial',0,0,'2026-07-22 01:02:15'),(10,5,2,NULL,'free_trial',0,0,'2026-07-22 01:16:42'),(11,5,2,NULL,'free_trial',0,0,'2026-07-22 01:16:42'),(12,5,2,NULL,'free_trial',0,0,'2026-07-22 01:22:15'),(13,5,2,NULL,'free_trial',0,0,'2026-07-22 01:22:15'),(14,4,2,NULL,'free_trial',0,0,'2026-07-22 02:20:19'),(15,4,2,NULL,'free_trial',0,0,'2026-07-22 02:20:19'),(16,8,2,NULL,'free_trial',0,0,'2026-07-22 17:30:17'),(17,8,2,NULL,'free_trial',0,0,'2026-07-22 17:30:17'),(18,4,2,NULL,'free_trial',0,0,'2026-07-22 21:08:10'),(19,4,2,NULL,'free_trial',0,0,'2026-07-22 21:08:10'),(20,4,2,NULL,'free_trial',0,0,'2026-07-22 21:26:00'),(21,4,2,NULL,'free_trial',0,0,'2026-07-22 21:26:00'),(22,4,2,NULL,'free_trial',0,0,'2026-07-22 21:26:15'),(23,4,2,NULL,'free_trial',0,0,'2026-07-22 21:26:15'),(24,4,2,NULL,'free_trial',0,0,'2026-07-22 21:26:24'),(25,4,2,NULL,'free_trial',0,0,'2026-07-22 21:26:25'),(26,4,1,NULL,'free_trial',0,0,'2026-07-22 21:26:30'),(27,4,1,NULL,'free_trial',0,0,'2026-07-22 21:26:30');
 /*!40000 ALTER TABLE `movie_access_logs` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -207,7 +206,7 @@ CREATE TABLE `movie_recommendations` (
   KEY `idx_recommended_movie_id` (`recommended_movie_id`),
   CONSTRAINT `movie_recommendations_ibfk_1` FOREIGN KEY (`movie_id`) REFERENCES `movies` (`id`) ON DELETE CASCADE,
   CONSTRAINT `movie_recommendations_ibfk_2` FOREIGN KEY (`recommended_movie_id`) REFERENCES `movies` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -216,7 +215,7 @@ CREATE TABLE `movie_recommendations` (
 
 LOCK TABLES `movie_recommendations` WRITE;
 /*!40000 ALTER TABLE `movie_recommendations` DISABLE KEYS */;
-INSERT INTO `movie_recommendations` VALUES (1,1,1),(3,3,2),(4,3,1);
+INSERT INTO `movie_recommendations` VALUES (6,6,4);
 /*!40000 ALTER TABLE `movie_recommendations` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -248,7 +247,7 @@ CREATE TABLE `movies` (
   `total_ratings` int(11) DEFAULT 0,
   PRIMARY KEY (`id`),
   KEY `idx_is_translated` (`is_translated`)
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -257,7 +256,7 @@ CREATE TABLE `movies` (
 
 LOCK TABLES `movies` WRITE;
 /*!40000 ALTER TABLE `movies` DISABLE KEYS */;
-INSERT INTO `movies` VALUES (1,'Movie La Kutisha','series','Bongo Movie','Kiswahili','Action',0,2026,2000.00,'Hii ni movie ya majaribio','https://res.cloudinary.com/dlokcqf1h/image/upload/v1784591533/movies/posters/xezrpgbehpovjxh0f19m.jpg','movies/posters/xezrpgbehpovjxh0f19m',NULL,NULL,NULL,'2026-07-20 23:52:24',0.00,0),(2,'MO is Calling','','','English','Drama',0,2008,2000.00,'Hii ni movie ya majaribio','https://res.cloudinary.com/dlokcqf1h/image/upload/v1784591636/movies/posters/apiizgn43fef9rzga1f9.jpg','movies/posters/apiizgn43fef9rzga1f9',NULL,NULL,NULL,'2026-07-20 23:54:02',0.00,0),(3,'Movie ya Tatu','single','Bongo Movie','English','Action',0,2010,2000.00,'Najaribu tu jamani','https://res.cloudinary.com/dlokcqf1h/image/upload/v1784756981/movies/posters/zyxnnuoztquundcweoit.png','movies/posters/zyxnnuoztquundcweoit','https://res.cloudinary.com/dlokcqf1h/video/upload/v1784756985/movies/videos/w3epn8ylzxy6ouf6qyas.mp4','movies/videos/w3epn8ylzxy6ouf6qyas','1m','2026-07-22 21:49:42',0.00,0);
+INSERT INTO `movies` VALUES (4,'Movie ya Majaribio','single','Movie ya Kiarabu','English','Love Story',0,2016,2000.00,'Najaribisha','https://res.cloudinary.com/dlokcqf1h/image/upload/v1784758764/movies/posters/z9ubge6ci77wvxxmrotg.png','movies/posters/z9ubge6ci77wvxxmrotg','https://res.cloudinary.com/dlokcqf1h/video/upload/v1784758768/movies/videos/ahzu301rwivjnfdkfgwu.mp4','movies/videos/ahzu301rwivjnfdkfgwu','1m','2026-07-22 22:17:17',0.00,0),(6,'Series ya Majaribio','series','Movie ya Kitaliano','Kiswahili','Love Story',0,2016,2000.00,'Series Kali Hii','https://res.cloudinary.com/dlokcqf1h/image/upload/v1784759749/movies/posters/gyxsimc3qw3gxq3fa7qa.png','movies/posters/gyxsimc3qw3gxq3fa7qa',NULL,NULL,NULL,'2026-07-22 22:36:03',0.00,0);
 /*!40000 ALTER TABLE `movies` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -417,7 +416,7 @@ CREATE TABLE `seasons` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `unique_season` (`movie_id`,`season_number`),
   CONSTRAINT `seasons_ibfk_1` FOREIGN KEY (`movie_id`) REFERENCES `movies` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -426,8 +425,42 @@ CREATE TABLE `seasons` (
 
 LOCK TABLES `seasons` WRITE;
 /*!40000 ALTER TABLE `seasons` DISABLE KEYS */;
-INSERT INTO `seasons` VALUES (1,1,1,'Season 1 - The Beginning','2026-07-20 23:52:24'),(2,1,2,'Season 2 - The Rise','2026-07-20 23:52:24');
+INSERT INTO `seasons` VALUES (4,6,1,'Mwangaza','2026-07-22 22:36:03'),(5,6,2,'Giza','2026-07-22 22:36:03');
 /*!40000 ALTER TABLE `seasons` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `subscription_cancellations`
+--
+
+DROP TABLE IF EXISTS `subscription_cancellations`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `subscription_cancellations` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `subscription_id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `reason` text DEFAULT NULL,
+  `status` enum('pending','processed','cancelled') DEFAULT 'pending',
+  `requested_at` datetime NOT NULL,
+  `processed_at` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_subscription_id` (`subscription_id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_status` (`status`),
+  CONSTRAINT `fk_cancellations_subscription` FOREIGN KEY (`subscription_id`) REFERENCES `subscriptions` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_cancellations_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `subscription_cancellations`
+--
+
+LOCK TABLES `subscription_cancellations` WRITE;
+/*!40000 ALTER TABLE `subscription_cancellations` DISABLE KEYS */;
+/*!40000 ALTER TABLE `subscription_cancellations` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -441,7 +474,7 @@ CREATE TABLE `subscriptions` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `user_id` int(11) NOT NULL,
   `plan_id` int(11) NOT NULL,
-  `status` enum('active','expired','cancelled','trial') DEFAULT 'active',
+  `status` enum('active','expired','cancelled','trial','cancelling') DEFAULT 'active',
   `expires_at` datetime NOT NULL,
   `created_at` datetime DEFAULT current_timestamp(),
   `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp(),
@@ -494,7 +527,7 @@ CREATE TABLE `users` (
   UNIQUE KEY `email` (`email`),
   KEY `idx_role_created` (`role`,`created_at`),
   KEY `idx_has_watched` (`has_watched_before`)
-) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -503,7 +536,7 @@ CREATE TABLE `users` (
 
 LOCK TABLES `users` WRITE;
 /*!40000 ALTER TABLE `users` DISABLE KEYS */;
-INSERT INTO `users` VALUES (1,'Administrator','+255677532140','Tanzania','Zanzibar',NULL,'mosnake111@gmail.com','$2b$10$8fFd8Tv6nQFROPWCt5vPt.4AavVo4155kbwDfLcRXbk4rKnH1vOWi','admin','2026-07-18 18:14:30',NULL,NULL,NULL,NULL,NULL,NULL,0),(4,'MO 11','0677532140','Kenya',NULL,'https://res.cloudinary.com/dlokcqf1h/image/upload/v1784405558/profiles/kfrcqtc8rilsrkiaumxd.png','molittle1011@gmail.com','$2b$10$ARmtTBWI1RdzD1/0wauZNuF0ZxlRlJEFaiskfZ0HwXzv978cU2MQa','user','2026-07-18 20:12:36','profiles/kfrcqtc8rilsrkiaumxd',NULL,NULL,NULL,NULL,NULL,0),(5,'Mohammed Aminu Shehe','0677532140','Tanzania','Zanzibar','https://res.cloudinary.com/dlokcqf1h/image/upload/v1784682704/profiles/lgdpoe1ao9nl5uuij2o5.png','fourbrothers10112627@gmail.com','$2b$10$3v7bc5Xz/T9nvvxT3f32mez3Qrxk4Sy97NHeTX0KLvOldm4lRht7K','user','2026-07-22 01:11:42','profiles/lgdpoe1ao9nl5uuij2o5',NULL,NULL,'969355','2026-07-22 07:47:43',NULL,0),(6,'Abdulmajid','+255774581923','Tanzania','Zanzibar',NULL,'abdulajmiiyypanass@gmail.com','$2b$10$bVrhZ1UrYpdBnobOM3UZdOYJdskVYF.DM8BsX7yoJNr4Sgvvtjt0W','admin','2026-07-22 17:17:37',NULL,NULL,NULL,NULL,NULL,NULL,0),(8,'Little MO','0677532140','Tanzania','Zanzibar','https://res.cloudinary.com/dlokcqf1h/image/upload/v1784741353/profiles/qonuitklavjxjxgpu900.jpg','abdulwarithshehe2010@gmail.com','$2b$10$4YYVkvcZ7BowuHIcDWScGOjagoAGvFwnx3.pB/GOrByUpEHS2mhFa','user','2026-07-22 17:29:11','profiles/qonuitklavjxjxgpu900',NULL,NULL,NULL,NULL,NULL,0);
+INSERT INTO `users` VALUES (1,'Administrator','+255677532140','Tanzania','Zanzibar',NULL,'mosnake111@gmail.com','$2b$10$8fFd8Tv6nQFROPWCt5vPt.4AavVo4155kbwDfLcRXbk4rKnH1vOWi','admin','2026-07-18 18:14:30',NULL,NULL,NULL,NULL,NULL,NULL,0),(4,'MO 11','0677532140','Kenya',NULL,'https://res.cloudinary.com/dlokcqf1h/image/upload/v1784405558/profiles/kfrcqtc8rilsrkiaumxd.png','molittle1011@gmail.com','$2b$10$ARmtTBWI1RdzD1/0wauZNuF0ZxlRlJEFaiskfZ0HwXzv978cU2MQa','user','2026-07-18 20:12:36','profiles/kfrcqtc8rilsrkiaumxd',NULL,NULL,NULL,NULL,NULL,0),(6,'Abdulmajid','+255774581923','Tanzania','Zanzibar',NULL,'abdulajmiiyypanass@gmail.com','$2b$10$bVrhZ1UrYpdBnobOM3UZdOYJdskVYF.DM8BsX7yoJNr4Sgvvtjt0W','admin','2026-07-22 17:17:37',NULL,NULL,NULL,NULL,NULL,NULL,0);
 /*!40000 ALTER TABLE `users` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -554,4 +587,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-07-23  3:29:09
+-- Dump completed on 2026-07-23 17:54:30

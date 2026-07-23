@@ -33,7 +33,6 @@ exports.createPayment = async (req, res) => {
                     required: ['cardNumber', 'expiryDate', 'cvv']
                 });
             }
-            // Validate card number format (basic)
             const cleanCard = cardNumber.replace(/\s/g, '');
             if (!/^\d{13,19}$/.test(cleanCard)) {
                 return res.status(400).json({
@@ -41,7 +40,6 @@ exports.createPayment = async (req, res) => {
                     message: "Invalid card number. Must be 13-19 digits."
                 });
             }
-            // Validate expiry date format
             const cleanExpiry = expiryDate.replace(/\s/g, '');
             if (!/^\d{2}\/\d{2}$/.test(cleanExpiry) && !/^\d{4}$/.test(cleanExpiry)) {
                 return res.status(400).json({
@@ -49,7 +47,6 @@ exports.createPayment = async (req, res) => {
                     message: "Invalid expiry date format. Use MM/YY or MMYY."
                 });
             }
-            // Validate CVV
             if (!/^\d{3,4}$/.test(cvv)) {
                 return res.status(400).json({
                     success: false,
@@ -100,9 +97,8 @@ exports.createPayment = async (req, res) => {
         let checkoutPayload;
 
         if (paymentMethod === 'bank_card') {
-            // Bank card payload - Using "CARD" as provider (common in AzamPay)
             checkoutPayload = {
-                provider: "CARD",  // Try "CARD" instead of "BANK_CARD"
+                provider: "CARD",
                 merchantAccountNumber: process.env.AZAMPAY_ACCOUNT_NUMBER,
                 merchantName: "TanzaFlix",
                 currencyCode: "TZS",
@@ -120,7 +116,6 @@ exports.createPayment = async (req, res) => {
                 source: "TanzaFlix"
             };
         } else {
-            // Mobile money payload
             checkoutPayload = {
                 provider: paymentMethod,
                 merchantAccountNumber: process.env.AZAMPAY_ACCOUNT_NUMBER,
@@ -141,13 +136,11 @@ exports.createPayment = async (req, res) => {
 
         const checkoutResponse = await azampay.createCheckout(checkoutPayload);
 
-        // Save AzamPay response
         await db.query(
             `UPDATE payments SET status = ?, gateway_response = ? WHERE id = ?`,
             ["processing", JSON.stringify(checkoutResponse), payment.insertId]
         );
 
-        // Return response
         res.json({
             success: true,
             paymentId: payment.insertId,
@@ -162,7 +155,6 @@ exports.createPayment = async (req, res) => {
     } catch (err) {
         console.log("Payment Error:", err.response?.data || err.message);
         
-        // Handle specific AzamPay errors
         let errorMessage = err.message;
         let errorCode = null;
         
@@ -272,6 +264,258 @@ exports.getPaymentHistory = async (req, res) => {
     }
 };
 
+// ==================== CANCEL SUBSCRIPTION ====================
+exports.cancelSubscription = async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        // Check if user has an active subscription
+        const [subscriptions] = await db.query(
+            `SELECT 
+                s.id,
+                s.status,
+                s.expires_at,
+                s.created_at,
+                p.name as plan_name,
+                p.price
+             FROM subscriptions s
+             LEFT JOIN plans p ON s.plan_id = p.id
+             WHERE s.user_id = ? AND s.status = 'active' AND s.expires_at > NOW()
+             ORDER BY s.expires_at DESC
+             LIMIT 1`,
+            [userId]
+        );
+
+        if (subscriptions.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "No active subscription found to cancel"
+            });
+        }
+
+        const subscription = subscriptions[0];
+
+        // Check if subscription is already set to cancel
+        const [cancelRequest] = await db.query(
+            `SELECT id FROM subscription_cancellations 
+             WHERE subscription_id = ? AND status = 'pending'`,
+            [subscription.id]
+        );
+
+        if (cancelRequest.length > 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Cancellation already requested for this subscription"
+            });
+        }
+
+        // Create cancellation request
+        await db.query(
+            `INSERT INTO subscription_cancellations (
+                subscription_id,
+                user_id,
+                reason,
+                status,
+                requested_at
+            ) VALUES (?, ?, ?, 'pending', NOW())`,
+            [subscription.id, userId, req.body.reason || null]
+        );
+
+        // Update subscription status to 'cancelling' (will expire at end of period)
+        await db.query(
+            `UPDATE subscriptions 
+             SET status = 'cancelling'
+             WHERE id = ?`,
+            [subscription.id]
+        );
+
+        res.json({
+            success: true,
+            message: "Subscription cancellation requested. You will have access until the end of your current billing period.",
+            data: {
+                subscription_id: subscription.id,
+                plan_name: subscription.plan_name,
+                expires_at: subscription.expires_at,
+                access_until: subscription.expires_at,
+                status: 'cancelling'
+            }
+        });
+
+    } catch (error) {
+        console.error("Cancel Subscription Error:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to cancel subscription"
+        });
+    }
+};
+
+// ==================== CANCEL IMMEDIATELY (Admin only) ====================
+exports.cancelSubscriptionImmediately = async (req, res) => {
+    try {
+        const userId = req.params.userId || req.body.userId;
+
+        if (!userId) {
+            return res.status(400).json({
+                success: false,
+                message: "User ID is required"
+            });
+        }
+
+        // Check if user has an active subscription
+        const [subscriptions] = await db.query(
+            `SELECT 
+                s.id,
+                s.status,
+                s.expires_at,
+                p.name as plan_name
+             FROM subscriptions s
+             LEFT JOIN plans p ON s.plan_id = p.id
+             WHERE s.user_id = ? AND s.status = 'active' AND s.expires_at > NOW()
+             ORDER BY s.expires_at DESC
+             LIMIT 1`,
+            [userId]
+        );
+
+        if (subscriptions.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "No active subscription found for this user"
+            });
+        }
+
+        const subscription = subscriptions[0];
+
+        // Cancel immediately - set status to 'expired' and expires_at to now
+        await db.query(
+            `UPDATE subscriptions 
+             SET status = 'expired', 
+                 expires_at = NOW()
+             WHERE id = ?`,
+            [subscription.id]
+        );
+
+        // Log cancellation
+        await db.query(
+            `INSERT INTO subscription_cancellations (
+                subscription_id,
+                user_id,
+                reason,
+                status,
+                requested_at,
+                processed_at
+            ) VALUES (?, ?, ?, 'processed', NOW(), NOW())`,
+            [subscription.id, userId, req.body.reason || 'Immediate cancellation by admin']
+        );
+
+        res.json({
+            success: true,
+            message: "Subscription cancelled immediately",
+            data: {
+                subscription_id: subscription.id,
+                plan_name: subscription.plan_name,
+                cancelled_at: new Date().toISOString()
+            }
+        });
+
+    } catch (error) {
+        console.error("Cancel Subscription Immediately Error:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to cancel subscription"
+        });
+    }
+};
+
+// ==================== GET USER SUBSCRIPTION STATUS ====================
+exports.getSubscriptionStatus = async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        // Get active subscription
+        const [active] = await db.query(
+            `SELECT 
+                s.id,
+                s.status,
+                s.expires_at,
+                s.created_at,
+                p.id as plan_id,
+                p.name as plan_name,
+                p.price,
+                p.duration_days,
+                DATEDIFF(s.expires_at, NOW()) as days_remaining
+             FROM subscriptions s
+             LEFT JOIN plans p ON s.plan_id = p.id
+             WHERE s.user_id = ? 
+             ORDER BY s.expires_at DESC
+             LIMIT 1`,
+            [userId]
+        );
+
+        // Get cancellation status if any
+        let cancellation = null;
+        if (active.length > 0 && active[0].status === 'cancelling') {
+            const [cancelData] = await db.query(
+                `SELECT 
+                    id,
+                    reason,
+                    requested_at,
+                    status
+                 FROM subscription_cancellations
+                 WHERE subscription_id = ? AND status = 'pending'
+                 ORDER BY requested_at DESC
+                 LIMIT 1`,
+                [active[0].id]
+            );
+            if (cancelData.length > 0) {
+                cancellation = cancelData[0];
+            }
+        }
+
+        // Get subscription history
+        const [history] = await db.query(
+            `SELECT 
+                s.id,
+                s.status,
+                s.expires_at,
+                s.created_at,
+                p.name as plan_name,
+                p.price
+             FROM subscriptions s
+             LEFT JOIN plans p ON s.plan_id = p.id
+             WHERE s.user_id = ?
+             ORDER BY s.created_at DESC
+             LIMIT 10`,
+            [userId]
+        );
+
+        res.json({
+            success: true,
+            subscription: active.length > 0 ? {
+                id: active[0].id,
+                status: active[0].status,
+                plan_id: active[0].plan_id,
+                plan_name: active[0].plan_name,
+                price: active[0].price,
+                duration_days: active[0].duration_days,
+                expires_at: active[0].expires_at,
+                created_at: active[0].created_at,
+                days_remaining: active[0].days_remaining || 0,
+                is_active: active[0].status === 'active' && new Date(active[0].expires_at) > new Date(),
+                cancellation: cancellation
+            } : null,
+            history: history
+        });
+
+    } catch (error) {
+        console.error("Get Subscription Status Error:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to get subscription status"
+        });
+    }
+};
+
 // ==================== AZAMPAY CALLBACK / WEBHOOK ====================
 exports.azamPayCallback = async (req, res) => {
     try {
@@ -286,15 +530,6 @@ exports.azamPayCallback = async (req, res) => {
             message,
             operator
         } = req.body;
-
-        // ============================
-        // WEBHOOK SECURITY VERIFICATION
-        // ============================
-        // Uncomment when AzamPay provides webhook signature
-        // const signature = req.headers['x-azampay-signature'];
-        // if (!azampay.verifyWebhookSignature(req.body, signature, process.env.AZAMPAY_WEBHOOK_SECRET)) {
-        //     return res.status(401).json({ error: 'Invalid signature' });
-        // }
 
         // Find payment
         const [payments] = await db.query(
@@ -312,9 +547,6 @@ exports.azamPayCallback = async (req, res) => {
 
         const payment = payments[0];
 
-        // ============================
-        // IDEMPOTENCY - PREVENT DOUBLE PROCESSING
-        // ============================
         if (payment.status === 'paid') {
             console.log("Payment already processed:", initiatorReferenceId);
             return res.json({
@@ -323,7 +555,6 @@ exports.azamPayCallback = async (req, res) => {
             });
         }
 
-        // Determine payment status
         let paymentStatus = status.toLowerCase();
 
         if (paymentStatus === "success" || paymentStatus === "completed") {
@@ -332,7 +563,6 @@ exports.azamPayCallback = async (req, res) => {
             paymentStatus = "failed";
         }
 
-        // Update payment record
         await db.query(
             `UPDATE payments 
              SET 
@@ -350,14 +580,8 @@ exports.azamPayCallback = async (req, res) => {
             ]
         );
 
-        // ============================
-        // IF PAID - ACTIVATE SUBSCRIPTION
-        // ============================
         if (paymentStatus === 'paid') {
             await activateUserSubscription(payment.user_id, payment.plan_id);
-            
-            // Send email notification (optional)
-            // await sendPaymentSuccessEmail(payment.user_id, payment);
         }
 
         console.log(`Payment ${paymentStatus} for reference: ${initiatorReferenceId}`);
@@ -379,7 +603,6 @@ exports.azamPayCallback = async (req, res) => {
 // ==================== ACTIVATE SUBSCRIPTION HELPER ====================
 async function activateUserSubscription(userId, planId) {
     try {
-        // Get plan duration
         const [planData] = await db.query(
             `SELECT duration_days FROM plans WHERE id = ?`,
             [planId]
@@ -389,10 +612,10 @@ async function activateUserSubscription(userId, planId) {
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + durationDays);
 
-        // Check if user already has an active subscription
+        // Check if user already has an active or cancelling subscription
         const [existingSub] = await db.query(
-            `SELECT id, expires_at FROM subscriptions 
-             WHERE user_id = ? AND status = 'active'`,
+            `SELECT id, expires_at, status FROM subscriptions 
+             WHERE user_id = ? AND status IN ('active', 'cancelling')`,
             [userId]
         );
 
@@ -403,8 +626,9 @@ async function activateUserSubscription(userId, planId) {
                  SET 
                     expires_at = DATE_ADD(expires_at, INTERVAL ? DAY),
                     plan_id = ?,
+                    status = 'active',
                     updated_at = NOW()
-                 WHERE user_id = ? AND status = 'active'`,
+                 WHERE user_id = ? AND status IN ('active', 'cancelling')`,
                 [durationDays, planId, userId]
             );
             
@@ -418,7 +642,6 @@ async function activateUserSubscription(userId, planId) {
             );
 
             if (expiredSub.length > 0) {
-                // Reactivate expired subscription
                 await db.query(
                     `UPDATE subscriptions 
                      SET 
@@ -430,7 +653,6 @@ async function activateUserSubscription(userId, planId) {
                     [planId, expiresAt, userId]
                 );
             } else {
-                // Create new subscription
                 await db.query(
                     `INSERT INTO subscriptions 
                      (user_id, plan_id, status, expires_at, created_at, updated_at)
@@ -496,7 +718,6 @@ exports.adminGetPaymentStats = async (req, res) => {
             WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)`
         );
 
-        // Get daily stats for chart
         const [dailyStats] = await db.query(
             `SELECT 
                 DATE(created_at) as date,
@@ -519,6 +740,51 @@ exports.adminGetPaymentStats = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Failed to fetch payment stats"
+        });
+    }
+};
+
+// ==================== ADMIN - GET ALL SUBSCRIPTIONS ====================
+exports.adminGetAllSubscriptions = async (req, res) => {
+    try {
+        const [subscriptions] = await db.query(
+            `SELECT 
+                s.id,
+                s.status,
+                s.expires_at,
+                s.created_at,
+                u.id as user_id,
+                u.full_name as user_name,
+                u.email as user_email,
+                p.id as plan_id,
+                p.name as plan_name,
+                p.price,
+                p.duration_days,
+                CASE 
+                    WHEN s.status = 'active' AND s.expires_at > NOW() THEN 'Active'
+                    WHEN s.status = 'cancelling' AND s.expires_at > NOW() THEN 'Pending Cancellation'
+                    WHEN s.status = 'cancelling' AND s.expires_at <= NOW() THEN 'Cancelled'
+                    WHEN s.status = 'expired' THEN 'Expired'
+                    ELSE s.status
+                END as status_label
+            FROM subscriptions s
+            LEFT JOIN users u ON s.user_id = u.id
+            LEFT JOIN plans p ON s.plan_id = p.id
+            ORDER BY s.created_at DESC
+            LIMIT 100`
+        );
+
+        res.json({
+            success: true,
+            total: subscriptions.length,
+            subscriptions
+        });
+
+    } catch (error) {
+        console.error("Admin Get Subscriptions Error:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to fetch subscriptions"
         });
     }
 };

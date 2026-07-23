@@ -12,6 +12,12 @@ router.get("/status/:reference", authenticate, paymentController.getPaymentStatu
 // Get user payment history
 router.get("/history", authenticate, paymentController.getPaymentHistory);
 
+// Get user subscription status
+router.get("/subscription/status", authenticate, paymentController.getSubscriptionStatus);
+
+// Cancel subscription (end of period)
+router.post("/subscription/cancel", authenticate, paymentController.cancelSubscription);
+
 // ==================== WEBHOOK (NO AUTH - AZAMPAY CALLS THIS) ====================
 router.post("/webhook", paymentController.azamPayCallback);
 
@@ -21,5 +27,11 @@ router.get("/admin/all", authenticate, isAdmin, paymentController.adminGetAllPay
 
 // Get payment statistics (admin)
 router.get("/admin/stats", authenticate, isAdmin, paymentController.adminGetPaymentStats);
+
+// Get all subscriptions (admin)
+router.get("/admin/subscriptions", authenticate, isAdmin, paymentController.adminGetAllSubscriptions);
+
+// Cancel subscription immediately (admin)
+router.post("/admin/subscription/cancel/:userId", authenticate, isAdmin, paymentController.cancelSubscriptionImmediately);
 
 module.exports = router;
