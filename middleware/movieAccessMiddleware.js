@@ -1,3 +1,4 @@
+// middleware/movieAccessMiddleware.js
 const db = require("../config/db");
 
 /**
@@ -38,8 +39,6 @@ const isFirstTimeWatcher = async (userId) => {
     );
     
     if (rows.length === 0) return false;
-    
-    // If has_watched_before is NULL or FALSE, it's first time
     return !rows[0].has_watched_before;
 };
 
@@ -86,7 +85,6 @@ const getMovieInfo = async (movieId) => {
  * Log movie access attempt
  */
 const logMovieAccess = async (userId, movieId, episodeId, accessType, completed = false, duration = 0) => {
-    // First validate that the movie exists
     const movieInfo = await getMovieInfo(movieId);
     if (!movieInfo) {
         console.log(`Movie ${movieId} not found, skipping log`);
@@ -98,11 +96,263 @@ const logMovieAccess = async (userId, movieId, episodeId, accessType, completed 
             `INSERT INTO movie_access_logs 
              (user_id, movie_id, episode_id, access_type, completed, watched_duration) 
              VALUES (?, ?, ?, ?, ?, ?)`,
-            [userId, movieId, episodeId, accessType, completed, duration]
+            [userId, movieId, episodeId, accessType, completed ? 1 : 0, duration]
         );
     } catch (error) {
-        // Log the error but don't fail the request
         console.error("Error logging movie access:", error.message);
+    }
+};
+
+/**
+ * ==================== CONTINUE WATCHING FUNCTIONS ====================
+ */
+
+/**
+ * Update watch progress for a user
+ */
+const updateWatchProgress = async (userId, movieId, episodeId, watchedDuration, totalDuration = null) => {
+    try {
+        if (!userId || !movieId) {
+            console.warn('Missing required fields for watch progress');
+            return { success: false, error: 'Missing required fields' };
+        }
+
+        const duration = Math.max(0, parseInt(watchedDuration) || 0);
+        const total = totalDuration ? parseInt(totalDuration) : null;
+        
+        let percentage = null;
+        if (total && total > 0) {
+            percentage = Math.min(100, (duration / total) * 100);
+        }
+
+        const [existing] = await db.query(
+            `SELECT id, watched_duration, completed FROM watch_progress 
+             WHERE user_id = ? AND movie_id = ? AND (episode_id = ? OR (episode_id IS NULL AND ? IS NULL))
+             LIMIT 1`,
+            [userId, movieId, episodeId || null, episodeId || null]
+        );
+
+        const isCompleted = percentage !== null && percentage >= 90;
+
+        if (existing.length > 0) {
+            await db.query(
+                `UPDATE watch_progress 
+                 SET watched_duration = ?,
+                     total_duration = COALESCE(?, total_duration),
+                     percentage = ?,
+                     completed = ?,
+                     last_updated = NOW()
+                 WHERE id = ?`,
+                [
+                    duration,
+                    total,
+                    percentage,
+                    isCompleted ? 1 : 0,
+                    existing[0].id
+                ]
+            );
+        } else {
+            await db.query(
+                `INSERT INTO watch_progress 
+                 (user_id, movie_id, episode_id, watched_duration, total_duration, percentage, completed)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    userId,
+                    movieId,
+                    episodeId || null,
+                    duration,
+                    total,
+                    percentage,
+                    isCompleted ? 1 : 0
+                ]
+            );
+        }
+
+        return { success: true, percentage, isCompleted };
+    } catch (error) {
+        console.error('Error updating watch progress:', error);
+        return { success: false, error: error.message };
+    }
+};
+
+/**
+ * Get continue watching items for a user - FIXED
+ */
+const getContinueWatching = async (userId, limit = 10) => {
+    try {
+        // First check if there's any progress for this user
+        const [checkProgress] = await db.query(
+            `SELECT COUNT(*) as count FROM watch_progress 
+             WHERE user_id = ? AND completed = 0 AND percentage < 90 
+             AND (percentage > 0 OR watched_duration > 10)`,
+            [userId]
+        );
+
+        if (checkProgress[0].count === 0) {
+            return {
+                success: true,
+                total: 0,
+                hasSubscription: false,
+                isFirstTime: false,
+                items: []
+            };
+        }
+
+        // Get watch progress with proper joins
+        const [results] = await db.query(
+            `SELECT 
+                wp.id as progress_id,
+                wp.movie_id,
+                wp.episode_id,
+                wp.watched_duration,
+                wp.total_duration,
+                wp.percentage,
+                wp.last_updated,
+                wp.completed,
+                m.id as movie_id,
+                m.title as movie_title,
+                m.poster,
+                m.movie_type,
+                m.movie_time,
+                e.id as episode_id,
+                e.episode_number,
+                e.episode_title,
+                e.duration as episode_duration,
+                s.season_number,
+                s.season_name
+             FROM watch_progress wp
+             INNER JOIN movies m ON wp.movie_id = m.id
+             LEFT JOIN episodes e ON wp.episode_id = e.id
+             LEFT JOIN seasons s ON e.season_id = s.id
+             WHERE wp.user_id = ?
+                AND wp.completed = 0
+                AND wp.percentage < 90
+                AND (wp.percentage > 0 OR wp.watched_duration > 10)
+             ORDER BY wp.last_updated DESC
+             LIMIT ?`,
+            [userId, parseInt(limit)]
+        );
+
+        // If no results, return empty
+        if (!results || results.length === 0) {
+            return {
+                success: true,
+                total: 0,
+                hasSubscription: false,
+                isFirstTime: false,
+                items: []
+            };
+        }
+
+        // Get subscription status
+        const [subscription] = await db.query(
+            `SELECT id, expires_at FROM subscriptions 
+             WHERE user_id = ? AND status = 'active' AND expires_at > NOW()
+             LIMIT 1`,
+            [userId]
+        );
+        const hasSubscription = subscription.length > 0;
+
+        // Get user's purchased movies
+        const [purchases] = await db.query(
+            `SELECT movie_id FROM movie_purchases 
+             WHERE user_id = ? AND status = 'completed' 
+                AND (expires_at IS NULL OR expires_at > NOW())`,
+            [userId]
+        );
+        const purchasedMovieIds = purchases.map(p => p.movie_id);
+
+        // Get first time watcher status
+        const [userData] = await db.query(
+            `SELECT has_watched_before FROM users WHERE id = ?`,
+            [userId]
+        );
+        const isFirstTime = !userData[0]?.has_watched_before;
+
+        const formatted = results.map(item => {
+            // Determine if user can watch this content
+            let canWatch = hasSubscription || purchasedMovieIds.includes(item.movie_id);
+            let accessType = null;
+            
+            if (hasSubscription) {
+                accessType = 'subscription';
+            } else if (purchasedMovieIds.includes(item.movie_id)) {
+                accessType = 'paid_single';
+            } else if (isFirstTime) {
+                accessType = 'free_trial_possible';
+                canWatch = true;
+            } else {
+                accessType = 'denied';
+                canWatch = false;
+            }
+
+            return {
+                progress_id: item.progress_id,
+                movie_id: item.movie_id,
+                episode_id: item.episode_id,
+                watched_duration: item.watched_duration || 0,
+                total_duration: item.total_duration || item.episode_duration || 0,
+                percentage: parseFloat(item.percentage || 0),
+                last_updated: item.last_updated,
+                completed: item.completed || 0,
+                movie_title: item.movie_title || 'Unknown Movie',
+                poster: item.poster || null,
+                movie_type: item.movie_type || 'single',
+                movie_time: item.movie_time || null,
+                episode_number: item.episode_number || null,
+                episode_title: item.episode_title || null,
+                episode_duration: item.episode_duration || null,
+                season_number: item.season_number || null,
+                season_name: item.season_name || null,
+                canWatch: canWatch,
+                accessType: accessType,
+                resume_at: item.watched_duration || 0,
+                display_title: item.episode_title 
+                    ? `${item.movie_title} - S${item.season_number || ''}E${item.episode_number || ''}: ${item.episode_title}`
+                    : item.movie_title || 'Unknown Movie'
+            };
+        });
+
+        return {
+            success: true,
+            total: formatted.length,
+            hasSubscription: hasSubscription,
+            isFirstTime: isFirstTime,
+            items: formatted
+        };
+
+    } catch (error) {
+        console.error('Error getting continue watching:', error);
+        return { success: false, error: error.message };
+    }
+};
+
+/**
+ * Mark as completed
+ */
+const markAsCompleted = async (userId, movieId, episodeId = null) => {
+    try {
+        await db.query(
+            `UPDATE watch_progress 
+             SET completed = 1, percentage = 100
+             WHERE user_id = ? AND movie_id = ? AND (episode_id = ? OR (episode_id IS NULL AND ? IS NULL))
+             LIMIT 1`,
+            [userId, movieId, episodeId || null, episodeId || null]
+        );
+
+        await db.query(
+            `UPDATE movie_access_logs 
+             SET completed = 1
+             WHERE user_id = ? AND movie_id = ? AND (episode_id = ? OR (episode_id IS NULL AND ? IS NULL))
+             ORDER BY created_at DESC
+             LIMIT 1`,
+            [userId, movieId, episodeId || null, episodeId || null]
+        );
+
+        return { success: true };
+    } catch (error) {
+        console.error('Error marking as completed:', error);
+        return { success: false, error: error.message };
     }
 };
 
@@ -122,7 +372,6 @@ const checkMovieAccess = async (req, res, next) => {
             });
         }
 
-        // VALIDATE: Check if movie exists
         const movieInfo = await getMovieInfo(movieId);
         if (!movieInfo) {
             return res.status(404).json({
@@ -131,13 +380,10 @@ const checkMovieAccess = async (req, res, next) => {
             });
         }
 
-        // 1. CHECK: Does user have valid subscription?
+        // 1. Check subscription
         const subscription = await hasValidSubscription(userId);
         if (subscription) {
-            // User has valid subscription - GRANT ACCESS
             await logMovieAccess(userId, movieId, episodeId, 'subscription');
-            
-            // Add subscription info to request
             req.accessGranted = true;
             req.accessType = 'subscription';
             req.subscriptionData = subscription;
@@ -145,12 +391,10 @@ const checkMovieAccess = async (req, res, next) => {
             return next();
         }
 
-        // 2. CHECK: Did user purchase this specific movie?
+        // 2. Check purchase
         const purchase = await hasPurchasedMovie(userId, movieId);
         if (purchase) {
-            // User purchased this movie - GRANT ACCESS
             await logMovieAccess(userId, movieId, episodeId, 'paid_single');
-            
             req.accessGranted = true;
             req.accessType = 'paid_single';
             req.purchaseData = purchase;
@@ -158,28 +402,21 @@ const checkMovieAccess = async (req, res, next) => {
             return next();
         }
 
-        // 3. CHECK: Is this the user's first time watching ANY movie?
+        // 3. Check first time watcher
         const firstTime = await isFirstTimeWatcher(userId);
         
         if (firstTime) {
-            // 4. CHECK: Did user already use their free trial on THIS movie (completed)?
             const usedTrial = await hasUsedFreeTrialForMovie(userId, movieId);
             
             if (!usedTrial) {
-                // First time ever + haven't completed trial on this movie - GRANT FREE TRIAL
-                // REMOVED: Immediate marking of has_watched_before
-                // Now we just log the access attempt without marking as completed
                 await logMovieAccess(userId, movieId, episodeId, 'free_trial', false, 0);
-                
                 req.accessGranted = true;
                 req.accessType = 'free_trial';
                 req.isFirstTime = true;
                 req.movieInfo = movieInfo;
                 return next();
             } else {
-                // Already completed free trial on this movie - DENY
                 await logMovieAccess(userId, movieId, episodeId, 'denied');
-                
                 return res.status(403).json({
                     success: false,
                     code: 'FREE_TRIAL_USED',
@@ -195,7 +432,7 @@ const checkMovieAccess = async (req, res, next) => {
             }
         }
 
-        // 5. NOT first time, no subscription, no purchase - DENY
+        // 5. Deny access
         await logMovieAccess(userId, movieId, episodeId, 'denied');
 
         return res.status(403).json({
@@ -229,14 +466,12 @@ const checkBasicAccess = async (req, res, next) => {
     try {
         const userId = req.user.id;
         
-        // Check subscription
         const subscription = await hasValidSubscription(userId);
         if (subscription) {
             req.hasSubscription = true;
             req.subscriptionData = subscription;
         }
         
-        // Check if first time
         const firstTime = await isFirstTimeWatcher(userId);
         req.isFirstTime = firstTime;
         
@@ -256,5 +491,8 @@ module.exports = {
     hasUsedFreeTrialForMovie,
     hasPendingFreeTrial,
     getMovieInfo,
-    logMovieAccess
+    logMovieAccess,
+    updateWatchProgress,
+    getContinueWatching,
+    markAsCompleted
 };

@@ -1,5 +1,6 @@
+// controllers/userMovieController.js
 const db = require("../config/db");
-const { logMovieAccess } = require("../middleware/movieAccessMiddleware");
+const { logMovieAccess, updateWatchProgress, getContinueWatching, markAsCompleted } = require("../middleware/movieAccessMiddleware");
 
 // Helper function to determine if user watched enough
 const hasWatchedEnough = (watchedDuration, totalDuration) => {
@@ -71,7 +72,6 @@ const getMovieRatingInfo = async (movieId, userId = null) => {
 // Helper: Check if user has a valid purchase for this movie
 const hasValidMoviePurchase = async (userId, movieId) => {
     try {
-        // Check for completed purchase (active or not expired)
         const [rows] = await db.query(
             `SELECT id, status, expires_at FROM movie_purchases 
              WHERE user_id = ? AND movie_id = ? 
@@ -85,7 +85,6 @@ const hasValidMoviePurchase = async (userId, movieId) => {
             return { valid: true, purchase: rows[0] };
         }
         
-        // Check for pending/processing purchase that might not be completed yet
         const [pendingRows] = await db.query(
             `SELECT id, status FROM movie_purchases 
              WHERE user_id = ? AND movie_id = ? 
@@ -105,6 +104,7 @@ const hasValidMoviePurchase = async (userId, movieId) => {
     }
 };
 
+// ==================== GET ALL MOVIES ====================
 exports.getMovies = async (req, res) => {
     try {
         const userId = req.user.id;
@@ -130,7 +130,6 @@ exports.getMovies = async (req, res) => {
              ORDER BY id DESC`
         );
 
-        // Get recommendations
         const [recommendations] = await db.query(
             `SELECT
                 mr.movie_id,
@@ -153,7 +152,6 @@ exports.getMovies = async (req, res) => {
             });
         });
 
-        // Get seasons data
         const [seasonsData] = await db.query(
             `SELECT 
                 s.movie_id,
@@ -193,7 +191,6 @@ exports.getMovies = async (req, res) => {
             }
         });
 
-        // Get user's subscription status
         const [subscription] = await db.query(
             `SELECT id, expires_at FROM subscriptions 
              WHERE user_id = ? AND status = 'active' AND expires_at > NOW()
@@ -202,7 +199,6 @@ exports.getMovies = async (req, res) => {
         );
         const hasSubscription = subscription.length > 0;
 
-        // Get user's purchased movies (check all possible statuses)
         const [purchases] = await db.query(
             `SELECT movie_id, status FROM movie_purchases 
              WHERE user_id = ? 
@@ -217,19 +213,16 @@ exports.getMovies = async (req, res) => {
             .filter(p => p.status === 'pending' || p.status === 'processing')
             .map(p => p.movie_id);
 
-        // Check if first time
         const [userData] = await db.query(
             `SELECT has_watched_before FROM users WHERE id = ?`,
             [userId]
         );
         const isFirstTime = !userData[0]?.has_watched_before;
 
-        // Get rating for each movie and check if user has rated
         const formattedMovies = [];
         for (const movie of movies) {
             const ratingInfo = await getMovieRatingInfo(movie.id, userId);
             
-            // Check if this specific movie is purchased
             const isPurchased = purchasedMovieIds.includes(movie.id);
             const isPending = pendingMovieIds.includes(movie.id);
 
@@ -280,12 +273,12 @@ exports.getMovies = async (req, res) => {
     }
 };
 
+// ==================== GET SINGLE MOVIE ====================
 exports.getMovie = async (req, res) => {
     try {
         const userId = req.user.id;
         const movieId = req.params.id;
 
-        // Get movie with access info
         const [rows] = await db.query(
             `SELECT
                 id,
@@ -319,7 +312,6 @@ exports.getMovie = async (req, res) => {
         const movie = rows[0];
         movie.is_translated = Boolean(movie.is_translated);
 
-        // Get recommendations
         const [related] = await db.query(
             `SELECT
                 m.id,
@@ -332,7 +324,6 @@ exports.getMovie = async (req, res) => {
         );
         movie.more_like_this = related;
 
-        // Check user access
         const [subscription] = await db.query(
             `SELECT id, expires_at FROM subscriptions 
              WHERE user_id = ? AND status = 'active' AND expires_at > NOW()
@@ -341,7 +332,6 @@ exports.getMovie = async (req, res) => {
         );
         const hasSubscription = subscription.length > 0;
 
-        // CRITICAL FIX: Check for ANY purchase status (not just completed)
         const [purchase] = await db.query(
             `SELECT id, status, expires_at FROM movie_purchases 
              WHERE user_id = ? AND movie_id = ? 
@@ -368,7 +358,6 @@ exports.getMovie = async (req, res) => {
         );
         const isFirstTime = !userData[0]?.has_watched_before;
 
-        // Determine if can watch
         let canWatch = false;
         let accessType = null;
         let accessMessage = null;
@@ -382,12 +371,10 @@ exports.getMovie = async (req, res) => {
             accessType = 'paid_single';
             accessMessage = "You have purchased this movie";
         } else if (isPurchasePending) {
-            // Still pending - show paywall but with pending message
             canWatch = false;
             accessType = 'pending_purchase';
             accessMessage = "Your purchase is being processed. Please wait or try again.";
         } else if (isFirstTime) {
-            // Check if already used free trial on this movie (completed)
             const [trialUsed] = await db.query(
                 `SELECT id FROM movie_access_logs 
                  WHERE user_id = ? AND movie_id = ? 
@@ -409,12 +396,10 @@ exports.getMovie = async (req, res) => {
             accessMessage = "Subscribe or purchase to watch this movie";
         }
 
-        // If can watch, include video URL
         if (canWatch) {
             await logMovieAccess(userId, movieId, null, accessType);
         }
 
-        // If series, get seasons with episodes
         if (movie.movie_type === 'series') {
             const [seasons] = await db.query(
                 `SELECT 
@@ -462,15 +447,32 @@ exports.getMovie = async (req, res) => {
             movie.seasons = Object.values(seasonsMap);
         }
 
-        // Remove video field from main movie object if can't watch
         if (!canWatch) {
             delete movie.video;
         }
 
-        // Get rating info for this movie
         const ratingInfo = await getMovieRatingInfo(movieId, userId);
 
-        // Prepare response
+        // Get watch progress for this movie if user has watched it
+        let watchProgress = null;
+        if (userId) {
+            const [progress] = await db.query(
+                `SELECT watched_duration, percentage, completed, last_updated
+                 FROM watch_progress
+                 WHERE user_id = ? AND movie_id = ? AND episode_id IS NULL
+                 LIMIT 1`,
+                [userId, movieId]
+            );
+            if (progress.length > 0) {
+                watchProgress = {
+                    watched_duration: progress[0].watched_duration || 0,
+                    percentage: parseFloat(progress[0].percentage || 0),
+                    completed: progress[0].completed === 1,
+                    last_updated: progress[0].last_updated
+                };
+            }
+        }
+
         const response = {
             success: true,
             movie: {
@@ -483,6 +485,7 @@ exports.getMovie = async (req, res) => {
                 isPurchasePending,
                 purchaseStatus,
                 isFirstTime,
+                watchProgress, // Add watch progress to response
                 rating: {
                     average: ratingInfo.average,
                     total: ratingInfo.total,
@@ -510,7 +513,7 @@ exports.getMovie = async (req, res) => {
     }
 };
 
-// MARK: Mark episode as completed
+// ==================== MARK EPISODE COMPLETE ====================
 exports.markEpisodeComplete = async (req, res) => {
     try {
         const userId = req.user.id;
@@ -523,6 +526,10 @@ exports.markEpisodeComplete = async (req, res) => {
             });
         }
 
+        // Update watch_progress
+        await updateWatchProgress(userId, movieId, episodeId, duration || 0, totalDuration || null);
+
+        // Also update access_logs for free trial tracking
         const [accessLog] = await db.query(
             `SELECT id, access_type, completed FROM movie_access_logs 
              WHERE user_id = ? AND movie_id = ? AND episode_id = ? 
@@ -584,7 +591,7 @@ exports.markEpisodeComplete = async (req, res) => {
     }
 };
 
-// MARK: Mark single movie as completed
+// ==================== MARK SINGLE MOVIE COMPLETE ====================
 exports.markMovieComplete = async (req, res) => {
     try {
         const userId = req.user.id;
@@ -597,6 +604,10 @@ exports.markMovieComplete = async (req, res) => {
             });
         }
 
+        // Update watch_progress
+        await updateWatchProgress(userId, movieId, null, duration || 0, totalDuration || null);
+
+        // Also update access_logs for free trial tracking
         const [accessLog] = await db.query(
             `SELECT id, access_type, completed FROM movie_access_logs 
              WHERE user_id = ? AND movie_id = ? 
@@ -659,7 +670,7 @@ exports.markMovieComplete = async (req, res) => {
     }
 };
 
-// MARK: Get user's watch history
+// ==================== GET WATCH HISTORY ====================
 exports.getWatchHistory = async (req, res) => {
     try {
         const userId = req.user.id;
@@ -692,6 +703,130 @@ exports.getWatchHistory = async (req, res) => {
 
     } catch (err) {
         console.error("Get Watch History Error:", err);
+        res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+};
+
+// ==================== CONTINUE WATCHING ====================
+
+exports.getContinueWatching = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { limit = 10 } = req.query;
+
+        const result = await getContinueWatching(userId, limit);
+
+        // If there's an error but not a "not found" error
+        if (!result.success) {
+            console.error('Continue watching error:', result.error);
+            return res.status(500).json({
+                success: false,
+                message: result.error || 'Failed to get continue watching'
+            });
+        }
+
+        // Always return success with data
+        res.json({
+            success: true,
+            data: result
+        });
+
+    } catch (err) {
+        console.error("Get Continue Watching Error:", err);
+        res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+};
+
+/**
+ * Update watch progress (called periodically while watching)
+ */
+exports.updateProgress = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { movieId, episodeId, watchedDuration, totalDuration } = req.body;
+
+        if (!movieId) {
+            return res.status(400).json({
+                success: false,
+                message: "Movie ID is required"
+            });
+        }
+
+        const result = await updateWatchProgress(
+            userId,
+            movieId,
+            episodeId || null,
+            watchedDuration || 0,
+            totalDuration || null
+        );
+
+        if (!result.success) {
+            return res.status(500).json({
+                success: false,
+                message: result.error || 'Failed to update progress'
+            });
+        }
+
+        // If completed (>=90%), update access_logs
+        if (result.isCompleted) {
+            await markAsCompleted(userId, movieId, episodeId || null);
+        }
+
+        res.json({
+            success: true,
+            progress: {
+                percentage: result.percentage,
+                isCompleted: result.isCompleted
+            },
+            message: result.isCompleted ? '🎉 Movie completed!' : 'Progress saved'
+        });
+
+    } catch (err) {
+        console.error("Update Progress Error:", err);
+        res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+};
+
+/**
+ * Manually mark as completed
+ */
+exports.markCompleted = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { movieId, episodeId } = req.body;
+
+        if (!movieId) {
+            return res.status(400).json({
+                success: false,
+                message: "Movie ID is required"
+            });
+        }
+
+        const result = await markAsCompleted(userId, movieId, episodeId || null);
+
+        if (!result.success) {
+            return res.status(500).json({
+                success: false,
+                message: result.error || 'Failed to mark as completed'
+            });
+        }
+
+        res.json({
+            success: true,
+            message: "Marked as completed"
+        });
+
+    } catch (err) {
+        console.error("Mark Completed Error:", err);
         res.status(500).json({
             success: false,
             message: err.message
