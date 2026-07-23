@@ -108,7 +108,7 @@ CREATE TABLE `movie_access_logs` (
   CONSTRAINT `fk_access_log_episode` FOREIGN KEY (`episode_id`) REFERENCES `episodes` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_access_log_movie` FOREIGN KEY (`movie_id`) REFERENCES `movies` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_access_log_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=160 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=177 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -117,7 +117,6 @@ CREATE TABLE `movie_access_logs` (
 
 LOCK TABLES `movie_access_logs` WRITE;
 /*!40000 ALTER TABLE `movie_access_logs` DISABLE KEYS */;
-INSERT INTO `movie_access_logs` VALUES (28,4,6,NULL,'free_trial',0,0,'2026-07-23 12:50:49'),(29,4,6,NULL,'free_trial',0,0,'2026-07-23 12:50:49'),(30,4,8,NULL,'free_trial',0,0,'2026-07-23 16:18:00'),(31,4,8,NULL,'free_trial',0,0,'2026-07-23 16:18:00'),(32,4,8,NULL,'free_trial',0,0,'2026-07-23 16:39:05'),(33,4,8,NULL,'free_trial',0,0,'2026-07-23 16:39:05'),(34,4,8,NULL,'free_trial',0,0,'2026-07-23 16:40:49'),(35,4,8,NULL,'free_trial',0,0,'2026-07-23 16:40:49'),(36,4,8,NULL,'free_trial',0,0,'2026-07-23 16:44:44'),(37,4,8,NULL,'free_trial',0,0,'2026-07-23 16:44:44'),(38,4,8,NULL,'free_trial',0,0,'2026-07-23 16:46:31'),(39,4,8,NULL,'free_trial',0,0,'2026-07-23 16:46:31'),(40,4,8,NULL,'free_trial',0,0,'2026-07-23 16:54:44'),(41,4,8,NULL,'free_trial',0,0,'2026-07-23 16:54:44'),(42,4,8,NULL,'free_trial',0,0,'2026-07-23 16:57:25'),(43,4,8,NULL,'free_trial',0,0,'2026-07-23 16:57:25'),(44,4,7,NULL,'free_trial',0,0,'2026-07-23 16:58:18'),(45,4,7,NULL,'free_trial',0,0,'2026-07-23 16:58:18'),(46,4,8,NULL,'free_trial',0,0,'2026-07-23 17:05:26'),(47,4,8,NULL,'free_trial',0,0,'2026-07-23 17:05:26'),(48,4,8,NULL,'free_trial',0,0,'2026-07-23 17:10:41'),(49,4,8,NULL,'free_trial',0,0,'2026-07-23 17:10:41'),(50,4,8,NULL,'free_trial',0,0,'2026-07-23 17:15:24'),(51,4,8,NULL,'free_trial',0,0,'2026-07-23 17:15:24'),(52,4,7,NULL,'free_trial',0,0,'2026-07-23 17:16:56'),(53,4,7,NULL,'free_trial',0,0,'2026-07-23 17:16:56'),(54,4,6,NULL,'free_trial',0,0,'2026-07-23 17:17:06'),(55,4,6,NULL,'free_trial',0,0,'2026-07-23 17:17:06'),(56,4,8,NULL,'free_trial',0,0,'2026-07-23 17:17:20'),(57,4,8,NULL,'free_trial',0,0,'2026-07-23 17:17:20'),(58,4,8,NULL,'free_trial',0,0,'2026-07-23 17:19:03'),(59,4,8,NULL,'free_trial',0,0,'2026-07-23 17:19:03'),(60,4,8,NULL,'free_trial',0,0,'2026-07-23 17:26:30'),(61,4,8,NULL,'free_trial',0,0,'2026-07-23 17:26:30'),(62,4,8,NULL,'free_trial',0,0,'2026-07-23 17:26:49'),(63,4,8,NULL,'free_trial',0,0,'2026-07-23 17:26:49'),(64,13,8,NULL,'free_trial',0,0,'2026-07-23 17:55:41'),(65,13,8,NULL,'free_trial',0,0,'2026-07-23 17:55:41'),(66,13,8,10,'',5,1,'2026-07-23 17:55:48'),(67,13,8,10,'',10,1,'2026-07-23 17:55:53'),(68,13,8,10,'',15,1,'2026-07-23 17:55:58'),(69,13,8,10,'',20,1,'2026-07-23 17:56:03'),(70,13,8,10,'',21,1,'2026-07-23 17:56:04'),(71,13,8,11,'',5,1,'2026-07-23 17:56:21'),(72,13,8,11,'',10,1,'2026-07-23 17:56:26'),(73,13,8,11,'',15,1,'2026-07-23 17:56:31'),(74,13,8,11,'',20,1,'2026-07-23 17:56:36'),(75,13,8,11,'',21,1,'2026-07-23 17:56:37'),(76,13,7,NULL,'free_trial',0,0,'2026-07-23 17:57:30'),(77,13,7,NULL,'free_trial',10,1,'2026-07-23 17:57:30'),(78,13,7,NULL,'denied',0,0,'2026-07-23 17:58:34'),(79,13,8,NULL,'denied',0,0,'2026-07-23 17:58:45'),(80,13,7,NULL,'denied',0,0,'2026-07-23 17:59:22'),(81,13,8,NULL,'denied',0,0,'2026-07-23 17:59:27'),(82,13,8,NULL,'denied',0,0,'2026-07-23 17:59:38'),(83,13,8,NULL,'denied',0,0,'2026-07-23 18:01:40'),(84,13,8,NULL,'denied',0,0,'2026-07-23 18:02:29'),(85,13,6,NULL,'denied',0,0,'2026-07-23 18:05:46'),(86,13,8,NULL,'denied',0,0,'2026-07-23 18:07:51'),(87,13,8,NULL,'denied',0,0,'2026-07-23 18:09:01'),(88,13,6,NULL,'denied',0,0,'2026-07-23 18:10:18'),(89,13,8,NULL,'denied',0,0,'2026-07-23 18:19:09'),(90,13,8,NULL,'denied',0,0,'2026-07-23 18:19:40'),(91,13,8,NULL,'denied',0,0,'2026-07-23 18:21:25'),(92,13,8,NULL,'denied',0,0,'2026-07-23 18:21:25'),(93,13,6,NULL,'denied',0,0,'2026-07-23 18:23:19'),(94,13,6,NULL,'denied',0,0,'2026-07-23 18:23:19'),(95,13,6,NULL,'denied',0,0,'2026-07-23 18:23:26'),(96,13,8,NULL,'denied',0,0,'2026-07-23 18:24:14'),(97,13,8,NULL,'denied',0,0,'2026-07-23 18:24:14'),(98,13,8,NULL,'denied',0,0,'2026-07-23 18:26:06'),(99,13,8,NULL,'denied',0,0,'2026-07-23 18:26:07'),(100,13,8,NULL,'denied',0,0,'2026-07-23 18:28:13'),(101,13,8,NULL,'denied',0,0,'2026-07-23 18:28:13'),(102,13,7,NULL,'denied',0,0,'2026-07-23 18:30:42'),(103,13,7,NULL,'denied',0,0,'2026-07-23 18:30:42'),(104,13,8,NULL,'denied',0,0,'2026-07-23 18:31:27'),(105,13,8,NULL,'denied',0,0,'2026-07-23 18:31:27'),(106,13,7,NULL,'denied',0,0,'2026-07-23 18:34:00'),(107,13,7,NULL,'denied',0,0,'2026-07-23 18:34:01'),(108,13,8,NULL,'denied',0,0,'2026-07-23 18:36:19'),(109,13,8,NULL,'denied',0,0,'2026-07-23 18:38:22'),(110,13,8,NULL,'denied',0,0,'2026-07-23 18:38:40'),(111,13,8,NULL,'denied',0,0,'2026-07-23 18:39:40'),(112,13,8,NULL,'denied',0,0,'2026-07-23 18:41:21'),(113,13,8,NULL,'denied',0,0,'2026-07-23 18:42:04'),(114,13,8,NULL,'denied',0,0,'2026-07-23 18:43:39'),(115,13,8,NULL,'denied',0,0,'2026-07-23 18:45:47'),(116,13,8,NULL,'denied',0,0,'2026-07-23 18:45:58'),(117,13,6,NULL,'denied',0,0,'2026-07-23 18:46:07'),(118,13,8,NULL,'denied',0,0,'2026-07-23 18:46:17'),(119,13,8,NULL,'denied',0,0,'2026-07-23 18:48:03'),(120,13,8,NULL,'denied',0,0,'2026-07-23 18:48:17'),(121,13,7,NULL,'denied',0,0,'2026-07-23 18:53:51'),(122,13,8,NULL,'denied',0,0,'2026-07-23 19:29:34'),(123,13,8,NULL,'denied',0,0,'2026-07-23 19:33:27'),(124,13,8,NULL,'denied',0,0,'2026-07-23 19:33:30'),(125,13,8,NULL,'denied',0,0,'2026-07-23 19:33:44'),(126,13,8,NULL,'denied',0,0,'2026-07-23 19:42:01'),(127,13,8,NULL,'denied',0,0,'2026-07-23 19:43:10'),(128,13,6,NULL,'denied',0,0,'2026-07-23 19:44:21'),(129,13,6,NULL,'denied',0,0,'2026-07-23 19:45:43'),(130,13,8,NULL,'denied',0,0,'2026-07-23 19:46:04'),(131,13,7,NULL,'denied',0,0,'2026-07-23 19:46:17'),(132,4,7,NULL,'free_trial',0,0,'2026-07-23 20:19:30'),(133,4,7,NULL,'free_trial',10,1,'2026-07-23 20:19:30'),(134,4,7,NULL,'denied',0,0,'2026-07-23 20:20:24'),(135,4,7,NULL,'denied',0,0,'2026-07-23 20:20:29'),(136,4,7,NULL,'denied',0,0,'2026-07-23 20:21:45'),(137,4,6,NULL,'denied',0,0,'2026-07-23 20:22:05'),(138,4,6,NULL,'denied',0,0,'2026-07-23 20:22:39'),(139,4,8,NULL,'denied',0,0,'2026-07-23 20:22:41'),(140,4,8,NULL,'denied',0,0,'2026-07-23 20:25:17'),(141,4,6,NULL,'denied',0,0,'2026-07-23 20:26:24'),(142,4,8,NULL,'denied',0,0,'2026-07-23 20:30:44'),(143,14,8,NULL,'free_trial',0,0,'2026-07-23 20:33:58'),(144,14,8,NULL,'free_trial',0,0,'2026-07-23 20:33:58'),(145,14,8,10,'',0,1,'2026-07-23 20:34:00'),(146,14,8,10,'',5,1,'2026-07-23 20:36:43'),(147,14,8,10,'',10,1,'2026-07-23 20:36:48'),(148,14,8,10,'',15,1,'2026-07-23 20:36:53'),(149,14,8,10,'',20,1,'2026-07-23 20:36:58'),(150,14,8,10,'',21,1,'2026-07-23 20:36:59'),(151,14,8,11,'',5,1,'2026-07-23 20:37:08'),(152,14,8,11,'',6,1,'2026-07-23 20:37:09'),(153,14,8,11,'',6,1,'2026-07-23 20:39:06'),(154,14,8,NULL,'free_trial',0,0,'2026-07-23 20:50:31'),(155,14,8,NULL,'free_trial',0,0,'2026-07-23 20:50:31'),(156,14,8,NULL,'free_trial',0,0,'2026-07-23 20:51:21'),(157,14,8,NULL,'free_trial',0,0,'2026-07-23 20:51:21'),(158,14,8,NULL,'free_trial',0,0,'2026-07-23 20:51:37'),(159,14,8,NULL,'free_trial',0,0,'2026-07-23 20:51:37');
 /*!40000 ALTER TABLE `movie_access_logs` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -155,7 +154,6 @@ CREATE TABLE `movie_purchases` (
 
 LOCK TABLES `movie_purchases` WRITE;
 /*!40000 ALTER TABLE `movie_purchases` DISABLE KEYS */;
-INSERT INTO `movie_purchases` VALUES (1,13,8,NULL,2000.00,'TZS','pending','2026-07-23 18:08:42',NULL),(3,13,7,NULL,2000.00,'TZS','pending','2026-07-23 18:30:51',NULL),(6,13,6,NULL,2000.00,'TZS','pending','2026-07-23 19:44:28',NULL),(7,4,7,NULL,2000.00,'TZS','pending','2026-07-23 20:20:40',NULL),(8,4,6,12,2000.00,'TZS','pending','2026-07-23 20:22:10',NULL),(9,4,8,13,2000.00,'TZS','pending','2026-07-23 20:22:51',NULL);
 /*!40000 ALTER TABLE `movie_purchases` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -189,7 +187,6 @@ CREATE TABLE `movie_ratings` (
 
 LOCK TABLES `movie_ratings` WRITE;
 /*!40000 ALTER TABLE `movie_ratings` DISABLE KEYS */;
-INSERT INTO `movie_ratings` VALUES (1,13,8,8.0,NULL,'2026-07-23 17:56:19'),(2,13,7,10.0,NULL,'2026-07-23 17:58:03');
 /*!40000 ALTER TABLE `movie_ratings` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -233,7 +230,7 @@ CREATE TABLE `movies` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `title` varchar(255) NOT NULL,
   `movie_type` enum('single','series') NOT NULL DEFAULT 'single',
-  `country` enum('Bongo Movie','Movie ya Kiarabu','Movie ya Kifilipino','Movie ya Kihindi','Movie ya Kitaliano','Movie ya Kikorea') NOT NULL,
+  `country` enum('Movie ya Kiengereza','Bongo Movie','Movie ya Kiarabu','Movie ya Kifilipino','Movie ya Kihindi','Movie ya Kitaliano','Movie ya Kikorea') NOT NULL,
   `language` varchar(100) NOT NULL,
   `category` enum('Action','Love Story','Drama','Mix') NOT NULL,
   `is_translated` tinyint(1) NOT NULL DEFAULT 0,
@@ -368,7 +365,6 @@ CREATE TABLE `payments` (
 
 LOCK TABLES `payments` WRITE;
 /*!40000 ALTER TABLE `payments` DISABLE KEYS */;
-INSERT INTO `payments` VALUES (1,4,3,'TFX-1784680862720-76EFDB',NULL,'','0677532140',NULL,15000.00,'TZS','pending',NULL,NULL,'2026-07-22 00:41:02','2026-07-22 00:41:02'),(2,4,3,'TFX-1784681137034-5E8B79',NULL,'','0677532140',NULL,15000.00,'TZS','pending',NULL,NULL,'2026-07-22 00:45:37','2026-07-22 00:45:37'),(3,4,3,'TFX-1784681477324-BD30A8',NULL,'','0000000000',NULL,15000.00,'TZS','pending',NULL,NULL,'2026-07-22 00:51:17','2026-07-22 00:51:17'),(4,4,3,'TFX-1784681650577-366364',NULL,'','0000000000',NULL,15000.00,'TZS','pending',NULL,NULL,'2026-07-22 00:54:10','2026-07-22 00:54:10'),(5,4,4,'TFX-1784752791086-02650B',NULL,'','0677532140',NULL,80000.00,'TZS','pending',NULL,NULL,'2026-07-22 20:39:51','2026-07-22 20:39:51'),(6,4,4,'TFX-1784752947247-988AA0',NULL,'','0677532140',NULL,80000.00,'TZS','processing','\"\"',NULL,'2026-07-22 20:42:27','2026-07-22 20:42:31'),(7,4,1,'TFX-1784753737315-6478B0',NULL,'','0000000000',NULL,5000.00,'TZS','pending',NULL,NULL,'2026-07-22 20:55:37','2026-07-22 20:55:37'),(8,4,1,'TFX-1784753930195-3C8E82',NULL,'','0000000000',NULL,5000.00,'TZS','pending',NULL,NULL,'2026-07-22 20:58:50','2026-07-22 20:58:50'),(9,4,1,'TFX-1784754091570-2D0770',NULL,'','0000000000',NULL,5000.00,'TZS','pending',NULL,NULL,'2026-07-22 21:01:31','2026-07-22 21:01:31'),(10,4,3,'TFX-1784754525270-336A0E',NULL,'bank_card',NULL,'MOHAMMED AMINU SHEHE',15000.00,'TZS','processing','\"\"',NULL,'2026-07-22 21:08:45','2026-07-22 21:08:49'),(11,4,1,'TFX-1784827713750-C222DE',NULL,'mix_by_yas','0677532140',NULL,5000.00,'TZS','processing','\"\"',NULL,'2026-07-23 17:28:33','2026-07-23 17:28:39'),(12,4,NULL,'MP-1784838130348-73AE8A2C',NULL,'mix_by_yas','0677532140',NULL,2000.00,'TZS','pending',NULL,NULL,'2026-07-23 20:22:10','2026-07-23 20:22:10'),(13,4,NULL,'MP-1784838171131-E5BC4F06',NULL,'mix_by_yas','0777730606',NULL,2000.00,'TZS','processing','\"\"',NULL,'2026-07-23 20:22:51','2026-07-23 20:22:54');
 /*!40000 ALTER TABLE `payments` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -530,7 +526,7 @@ CREATE TABLE `users` (
   UNIQUE KEY `email` (`email`),
   KEY `idx_role_created` (`role`,`created_at`),
   KEY `idx_has_watched` (`has_watched_before`)
-) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -539,7 +535,7 @@ CREATE TABLE `users` (
 
 LOCK TABLES `users` WRITE;
 /*!40000 ALTER TABLE `users` DISABLE KEYS */;
-INSERT INTO `users` VALUES (1,'Administrator','+255677532140','Tanzania','Zanzibar',NULL,'mosnake111@gmail.com','$2b$10$8fFd8Tv6nQFROPWCt5vPt.4AavVo4155kbwDfLcRXbk4rKnH1vOWi','admin','2026-07-18 18:14:30',NULL,NULL,NULL,NULL,NULL,NULL,0),(4,'MO Snake','0677532140','Tanzania','Zanzibar','https://res.cloudinary.com/dlokcqf1h/image/upload/v1784405558/profiles/kfrcqtc8rilsrkiaumxd.png','molittle1011@gmail.com','$2b$10$ARmtTBWI1RdzD1/0wauZNuF0ZxlRlJEFaiskfZ0HwXzv978cU2MQa','user','2026-07-18 20:12:36','profiles/kfrcqtc8rilsrkiaumxd',NULL,NULL,NULL,NULL,'2026-07-23 20:19:50',1),(6,'Abdulmajid','+255774581923','Tanzania','Zanzibar',NULL,'abdulajmiiyypanass@gmail.com','$2b$10$bVrhZ1UrYpdBnobOM3UZdOYJdskVYF.DM8BsX7yoJNr4Sgvvtjt0W','admin','2026-07-22 17:17:37',NULL,NULL,NULL,NULL,NULL,NULL,0),(13,'ZR','0777730606','Tanzania','Zanzibar',NULL,'ZAR@gmail.com','$2b$10$Ip2/P1.fUMHkbL03zyXMNuCZTGstVLhVeTUpCZ2Rh.bQQfnXURXVi','user','2026-07-23 17:40:05',NULL,NULL,NULL,NULL,NULL,'2026-07-23 17:57:45',1),(14,'MO','0677532140','Tanzania','Zanzibar',NULL,'mosnake11@gmail.com','$2b$10$TLbdv95klZmYZSepEXVwU.2L1mHyMbdt1mE5Gxr9kdYvVzRISdTFC','user','2026-07-23 20:31:42',NULL,NULL,NULL,NULL,NULL,NULL,0);
+INSERT INTO `users` VALUES (1,'Administrator','+255677532140','Tanzania','Zanzibar',NULL,'mosnake111@gmail.com','$2b$10$8fFd8Tv6nQFROPWCt5vPt.4AavVo4155kbwDfLcRXbk4rKnH1vOWi','admin','2026-07-18 18:14:30',NULL,NULL,NULL,NULL,NULL,NULL,0),(6,'Abdulmajid','+255774581923','Tanzania','Zanzibar',NULL,'abdulajmiiyypanass@gmail.com','$2b$10$bVrhZ1UrYpdBnobOM3UZdOYJdskVYF.DM8BsX7yoJNr4Sgvvtjt0W','admin','2026-07-22 17:17:37',NULL,NULL,NULL,NULL,NULL,NULL,0);
 /*!40000 ALTER TABLE `users` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -571,7 +567,7 @@ CREATE TABLE `watch_progress` (
   CONSTRAINT `watch_progress_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `watch_progress_ibfk_2` FOREIGN KEY (`movie_id`) REFERENCES `movies` (`id`) ON DELETE CASCADE,
   CONSTRAINT `watch_progress_ibfk_3` FOREIGN KEY (`episode_id`) REFERENCES `episodes` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -580,7 +576,6 @@ CREATE TABLE `watch_progress` (
 
 LOCK TABLES `watch_progress` WRITE;
 /*!40000 ALTER TABLE `watch_progress` DISABLE KEYS */;
-INSERT INTO `watch_progress` VALUES (1,4,7,NULL,19,21,90.48,1,'2026-07-23 20:20:02'),(2,14,8,10,21,21,100.00,1,'2026-07-23 20:36:59'),(3,14,8,11,6,21,28.57,0,'2026-07-23 20:51:37');
 /*!40000 ALTER TABLE `watch_progress` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -593,4 +588,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-07-24  2:26:30
+-- Dump completed on 2026-07-24  3:12:54
