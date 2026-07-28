@@ -16,6 +16,40 @@
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
+-- Table structure for table `ads`
+--
+
+DROP TABLE IF EXISTS `ads`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ads` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `title` varchar(255) NOT NULL,
+  `url` varchar(500) NOT NULL,
+  `image_url` varchar(500) NOT NULL,
+  `image_public_id` varchar(255) DEFAULT NULL,
+  `status` enum('active','inactive') DEFAULT 'active',
+  `clicks` int(11) DEFAULT 0,
+  `views` int(11) DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_status` (`status`),
+  KEY `idx_created_at` (`created_at`)
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `ads`
+--
+
+LOCK TABLES `ads` WRITE;
+/*!40000 ALTER TABLE `ads` DISABLE KEYS */;
+INSERT INTO `ads` VALUES (1,'TanzaFlix Sale','https://fourbrothers.online','https://res.cloudinary.com/dlokcqf1h/image/upload/v1785246013/ads/dg3wttmrmgb4matj0imi.png','ads/dg3wttmrmgb4matj0imi','active',0,1,'2026-07-28 13:40:14','2026-07-28 13:43:24');
+/*!40000 ALTER TABLE `ads` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `episodes`
 --
 
@@ -526,7 +560,7 @@ CREATE TABLE `users` (
   UNIQUE KEY `email` (`email`),
   KEY `idx_role_created` (`role`,`created_at`),
   KEY `idx_has_watched` (`has_watched_before`)
-) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -535,7 +569,7 @@ CREATE TABLE `users` (
 
 LOCK TABLES `users` WRITE;
 /*!40000 ALTER TABLE `users` DISABLE KEYS */;
-INSERT INTO `users` VALUES (7,'MO Little','+255677532140','Tanzania','Zanzibar',NULL,'mosnake111@gmail.com','$2b$10$vqRKB5RUafKTZ0Gs2.ZoueUGDcLWOtnnVG.WkEwhBNkGy3yCzjtx6','admin','2026-07-24 00:26:51',NULL,NULL,NULL,NULL,NULL,NULL,0),(9,'Abdul Majid','+255774581923','Tanzania','Zanzibar',NULL,'abdulajmiiyypanass@gmail.com','$2b$10$COGXpowagbF0Vj9GojrWk.zGKrGJanYgV.x8rklLsiOzL0W4lWbka','admin','2026-07-24 00:30:23',NULL,NULL,NULL,NULL,NULL,NULL,0);
+INSERT INTO `users` VALUES (7,'MO Little','+255677532140','Tanzania','Zanzibar',NULL,'mosnake111@gmail.com','$2b$10$vqRKB5RUafKTZ0Gs2.ZoueUGDcLWOtnnVG.WkEwhBNkGy3yCzjtx6','admin','2026-07-24 00:26:51',NULL,NULL,NULL,NULL,NULL,NULL,0),(9,'Abdul Majid','+255774581923','Tanzania','Zanzibar',NULL,'abdulajmiiyypanass@gmail.com','$2b$10$COGXpowagbF0Vj9GojrWk.zGKrGJanYgV.x8rklLsiOzL0W4lWbka','admin','2026-07-24 00:30:23',NULL,NULL,NULL,NULL,NULL,NULL,0),(11,'Mohammed Aminu Shehe','777730606','Tanzania','Zanzibar',NULL,'molittle1011@gmail.com','$2b$10$Eht71CyC19kZAsXyEjT29.fKNa.0r36fpD1QvYXum3Jor9mBVZHCG','user','2026-07-28 13:00:14',NULL,NULL,NULL,NULL,NULL,NULL,0);
 /*!40000 ALTER TABLE `users` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -588,4 +622,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-07-24  6:14:45
+-- Dump completed on 2026-07-28 19:17:02

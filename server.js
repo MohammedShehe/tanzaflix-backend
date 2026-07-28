@@ -1,4 +1,3 @@
-// server.js
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
@@ -46,6 +45,7 @@ app.use("/api/payments", require("./routes/paymentRoutes"));
 app.use("/api/movie-purchases", require("./routes/moviePurchaseRoutes"));
 app.use("/api/admin/activities", require("./routes/adminActivitiesRoutes"));
 app.use("/api/ratings", require("./routes/ratingRoutes"));
+app.use("/api/ads", require("./routes/adminAdRoutes"));
 
 // Health check
 app.get("/health", (req, res) => {
