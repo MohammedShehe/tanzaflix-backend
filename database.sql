@@ -36,7 +36,7 @@ CREATE TABLE `ads` (
   PRIMARY KEY (`id`),
   KEY `idx_status` (`status`),
   KEY `idx_created_at` (`created_at`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -45,7 +45,7 @@ CREATE TABLE `ads` (
 
 LOCK TABLES `ads` WRITE;
 /*!40000 ALTER TABLE `ads` DISABLE KEYS */;
-INSERT INTO `ads` VALUES (1,'TanzaFlix Sale','https://fourbrothers.online','https://res.cloudinary.com/dlokcqf1h/image/upload/v1785246013/ads/dg3wttmrmgb4matj0imi.png','ads/dg3wttmrmgb4matj0imi','active',0,1,'2026-07-28 13:40:14','2026-07-28 13:43:24');
+INSERT INTO `ads` VALUES (1,'Movie Mpya','https://fourbrothers.online','https://res.cloudinary.com/dlokcqf1h/image/upload/v1785252532/ads/nu7xau8kig1szxezec0l.webp','ads/nu7xau8kig1szxezec0l','active',0,5,'2026-07-28 13:40:14','2026-07-28 15:33:31'),(2,'Wiki Hii','https://fourbrothers.online','https://res.cloudinary.com/dlokcqf1h/image/upload/v1785252565/ads/wajmpnpqbumbw74lh159.jpg','ads/wajmpnpqbumbw74lh159','active',0,3,'2026-07-28 15:29:26','2026-07-28 15:33:31'),(3,'Wahi Sasa','https://fourbrothers.online','https://res.cloudinary.com/dlokcqf1h/image/upload/v1785252599/ads/iqfdhjx3h5krxlue9iq9.png','ads/iqfdhjx3h5krxlue9iq9','active',1,3,'2026-07-28 15:29:59','2026-07-28 15:33:31');
 /*!40000 ALTER TABLE `ads` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -142,7 +142,7 @@ CREATE TABLE `movie_access_logs` (
   CONSTRAINT `fk_access_log_episode` FOREIGN KEY (`episode_id`) REFERENCES `episodes` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_access_log_movie` FOREIGN KEY (`movie_id`) REFERENCES `movies` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_access_log_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -151,6 +151,7 @@ CREATE TABLE `movie_access_logs` (
 
 LOCK TABLES `movie_access_logs` WRITE;
 /*!40000 ALTER TABLE `movie_access_logs` DISABLE KEYS */;
+INSERT INTO `movie_access_logs` VALUES (1,11,11,NULL,'free_trial',50,1,'2026-07-28 15:34:13');
 /*!40000 ALTER TABLE `movie_access_logs` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -429,7 +430,7 @@ CREATE TABLE `plans` (
 
 LOCK TABLES `plans` WRITE;
 /*!40000 ALTER TABLE `plans` DISABLE KEYS */;
-INSERT INTO `plans` VALUES (1,'Daily',5000.00,'TZS',1,'Unlimited access for 1 day','active','2026-07-24 00:34:23','2026-07-24 00:34:23'),(2,'Weekly',8000.00,'TZS',7,'Unlimited access for 7 days','active','2026-07-24 00:34:23','2026-07-24 00:34:23'),(3,'Monthly',15000.00,'TZS',30,'Unlimited access for 30 days','active','2026-07-24 00:34:23','2026-07-24 00:34:23'),(4,'Yearly',80000.00,'TZS',365,'Unlimited access for 365 days','active','2026-07-24 00:34:23','2026-07-24 00:34:23');
+INSERT INTO `plans` VALUES (1,'Daily',5000.00,'TZS',1,'Unlimited access for 1 day','active','2026-07-24 00:34:23','2026-07-24 00:34:23'),(2,'Weekly',20000.00,'TZS',7,'Unlimited access for 7 days','active','2026-07-24 00:34:23','2026-07-28 15:48:32'),(3,'Monthly',150000.00,'TZS',30,'Unlimited access for 30 days','active','2026-07-24 00:34:23','2026-07-28 15:48:32'),(4,'Yearly',1000000.00,'TZS',365,'Unlimited access for 365 days','active','2026-07-24 00:34:23','2026-07-28 15:48:32');
 /*!40000 ALTER TABLE `plans` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -569,7 +570,7 @@ CREATE TABLE `users` (
 
 LOCK TABLES `users` WRITE;
 /*!40000 ALTER TABLE `users` DISABLE KEYS */;
-INSERT INTO `users` VALUES (7,'MO Little','+255677532140','Tanzania','Zanzibar',NULL,'mosnake111@gmail.com','$2b$10$vqRKB5RUafKTZ0Gs2.ZoueUGDcLWOtnnVG.WkEwhBNkGy3yCzjtx6','admin','2026-07-24 00:26:51',NULL,NULL,NULL,NULL,NULL,NULL,0),(9,'Abdul Majid','+255774581923','Tanzania','Zanzibar',NULL,'abdulajmiiyypanass@gmail.com','$2b$10$COGXpowagbF0Vj9GojrWk.zGKrGJanYgV.x8rklLsiOzL0W4lWbka','admin','2026-07-24 00:30:23',NULL,NULL,NULL,NULL,NULL,NULL,0),(11,'Mohammed Aminu Shehe','777730606','Tanzania','Zanzibar',NULL,'molittle1011@gmail.com','$2b$10$Eht71CyC19kZAsXyEjT29.fKNa.0r36fpD1QvYXum3Jor9mBVZHCG','user','2026-07-28 13:00:14',NULL,NULL,NULL,NULL,NULL,NULL,0);
+INSERT INTO `users` VALUES (7,'MO Little','+255677532140','Tanzania','Zanzibar',NULL,'mosnake111@gmail.com','$2b$10$vqRKB5RUafKTZ0Gs2.ZoueUGDcLWOtnnVG.WkEwhBNkGy3yCzjtx6','admin','2026-07-24 00:26:51',NULL,NULL,NULL,NULL,NULL,NULL,0),(9,'Abdul Majid','+255774581923','Tanzania','Zanzibar',NULL,'abdulajmiiyypanass@gmail.com','$2b$10$COGXpowagbF0Vj9GojrWk.zGKrGJanYgV.x8rklLsiOzL0W4lWbka','admin','2026-07-24 00:30:23',NULL,NULL,NULL,NULL,NULL,NULL,0),(11,'Mohammed Aminu Shehe','777730606','Tanzania','Zanzibar',NULL,'molittle1011@gmail.com','$2b$10$Eht71CyC19kZAsXyEjT29.fKNa.0r36fpD1QvYXum3Jor9mBVZHCG','user','2026-07-28 13:00:14',NULL,NULL,NULL,NULL,NULL,'2026-07-28 15:34:21',1);
 /*!40000 ALTER TABLE `users` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -601,7 +602,7 @@ CREATE TABLE `watch_progress` (
   CONSTRAINT `watch_progress_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `watch_progress_ibfk_2` FOREIGN KEY (`movie_id`) REFERENCES `movies` (`id`) ON DELETE CASCADE,
   CONSTRAINT `watch_progress_ibfk_3` FOREIGN KEY (`episode_id`) REFERENCES `episodes` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -610,6 +611,7 @@ CREATE TABLE `watch_progress` (
 
 LOCK TABLES `watch_progress` WRITE;
 /*!40000 ALTER TABLE `watch_progress` DISABLE KEYS */;
+INSERT INTO `watch_progress` VALUES (1,11,11,NULL,52,52,100.00,1,'2026-07-28 15:34:23'),(2,11,11,NULL,50,52,96.15,1,'2026-07-28 15:34:21');
 /*!40000 ALTER TABLE `watch_progress` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -622,4 +624,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-07-28 19:17:02
+-- Dump completed on 2026-07-28 21:19:06
