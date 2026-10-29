@@ -1,14 +1,15 @@
 const db = require("../config/db");
 const crypto = require("crypto");
-const azampay = require("../services/azampayService");
+const snippe = require("../services/snippeService");
+
+const MOBILE_METHODS = ["mpesa", "airtel_money", "mix_by_yas", "halotel", "mobile"];
 
 // ==================== CREATE PAYMENT ====================
 exports.createPayment = async (req, res) => {
     try {
         const userId = req.user.id;
-        const { planId, paymentMethod, phoneNumber, accountName, cardNumber, expiryDate, cvv } = req.body;
+        const { planId, paymentMethod, phoneNumber, accountName } = req.body;
 
-        // Validate input
         if (!planId || !paymentMethod) {
             return res.status(400).json({
                 success: false,
@@ -16,46 +17,16 @@ exports.createPayment = async (req, res) => {
             });
         }
 
-        // For mobile money, phone number is required
-        if (['mpesa', 'airtel_money', 'mix_by_yas'].includes(paymentMethod) && !phoneNumber) {
+        const isMobile = MOBILE_METHODS.includes(paymentMethod);
+        const isCard = paymentMethod === "bank_card" || paymentMethod === "card";
+
+        if (isMobile && !phoneNumber) {
             return res.status(400).json({
                 success: false,
                 message: "Phone number is required for mobile money payments."
             });
         }
 
-        // For bank card, card details are required
-        if (paymentMethod === 'bank_card') {
-            if (!cardNumber || !expiryDate || !cvv) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Card details are required for bank card payments.",
-                    required: ['cardNumber', 'expiryDate', 'cvv']
-                });
-            }
-            const cleanCard = cardNumber.replace(/\s/g, '');
-            if (!/^\d{13,19}$/.test(cleanCard)) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Invalid card number. Must be 13-19 digits."
-                });
-            }
-            const cleanExpiry = expiryDate.replace(/\s/g, '');
-            if (!/^\d{2}\/\d{2}$/.test(cleanExpiry) && !/^\d{4}$/.test(cleanExpiry)) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Invalid expiry date format. Use MM/YY or MMYY."
-                });
-            }
-            if (!/^\d{3,4}$/.test(cvv)) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Invalid CVV. Must be 3-4 digits."
-                });
-            }
-        }
-
-        // Get plan from database
         const [plans] = await db.query(
             `SELECT * FROM plans WHERE id = ? AND status = 'active'`,
             [planId]
@@ -70,110 +41,116 @@ exports.createPayment = async (req, res) => {
 
         const plan = plans[0];
 
-        // Generate unique reference
-        const paymentReference = "TFX-" + Date.now() + "-" + crypto.randomBytes(3).toString("hex").toUpperCase();
+        // Load user for Snippe customer object
+        const [users] = await db.query(
+            `SELECT full_name, email, phone FROM users WHERE id = ?`,
+            [userId]
+        );
+        const user = users[0] || {};
+        const { firstname, lastname } = snippe.splitName(user.full_name || accountName);
+        const customer = {
+            firstname,
+            lastname,
+            email: user.email || "customer@tanzaflix.local"
+        };
 
-        // Save pending payment
+        const paymentReference = "TFX-" + Date.now() + "-" + crypto.randomBytes(3).toString("hex").toUpperCase();
+        const idempotencyKey = paymentReference.slice(0, 30);
+
         const [payment] = await db.query(
             `INSERT INTO payments (
-                user_id, plan_id, payment_reference, payment_method, 
+                user_id, plan_id, payment_reference, payment_method,
                 phone_number, account_name, amount, status
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-                userId, 
-                plan.id, 
-                paymentReference, 
-                paymentMethod, 
-                phoneNumber || null,
-                accountName || null,
-                plan.price, 
+                userId,
+                plan.id,
+                paymentReference,
+                paymentMethod,
+                phoneNumber || user.phone || null,
+                accountName || user.full_name || null,
+                plan.price,
                 "pending"
             ]
         );
 
         // ============================
-        // SEND PAYMENT TO AZAMPAY
+        // SEND PAYMENT TO SNIPPE
         // ============================
-        let checkoutPayload;
+        let checkoutResponse;
 
-        if (paymentMethod === 'bank_card') {
-            checkoutPayload = {
-                provider: "CARD",
-                merchantAccountNumber: process.env.AZAMPAY_ACCOUNT_NUMBER,
-                merchantName: "TanzaFlix",
-                currencyCode: "TZS",
-                amount: plan.price.toString(),
-                referenceId: paymentReference,
-                merchantReferenceId: paymentReference,
-                cardNumber: cardNumber.replace(/\s/g, ''),
-                expiryDate: expiryDate.replace(/\s/g, ''),
-                cvv: cvv,
-                accountName: accountName || "TanzaFlix User",
-                additionalProperties: {
-                    provider: "CARD",
-                    paymentType: "subscription"
+        if (isCard) {
+            const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+            checkoutResponse = await snippe.createCardPayment({
+                amount: plan.price,
+                phoneNumber: phoneNumber || user.phone || "255700000000",
+                customer,
+                callbackUrl: `${frontendUrl}/subscription.html?ref=${paymentReference}`,
+                metadata: {
+                    order_id: paymentReference,
+                    type: "subscription",
+                    plan_id: String(plan.id),
+                    user_id: String(userId)
                 },
-                source: "TanzaFlix"
-            };
+                idempotencyKey
+            });
         } else {
-            checkoutPayload = {
-                provider: paymentMethod,
-                merchantAccountNumber: process.env.AZAMPAY_ACCOUNT_NUMBER,
-                merchantName: "TanzaFlix",
-                merchantMobileNumber: phoneNumber,
-                currencyCode: "TZS",
-                amount: plan.price.toString(),
-                referenceId: paymentReference,
-                merchantReferenceId: paymentReference,
-                additionalProperties: {
-                    provider: paymentMethod
+            // Default: mobile money (USSD push) – network auto-detected from phone
+            checkoutResponse = await snippe.createMobilePayment({
+                amount: plan.price,
+                phoneNumber,
+                customer,
+                metadata: {
+                    order_id: paymentReference,
+                    type: "subscription",
+                    plan_id: String(plan.id),
+                    user_id: String(userId)
                 },
-                source: "TanzaFlix"
-            };
+                idempotencyKey
+            });
         }
 
-        console.log("Sending AzamPay payload:", JSON.stringify(checkoutPayload, null, 2));
-
-        const checkoutResponse = await azampay.createCheckout(checkoutPayload);
+        const snippeRef = checkoutResponse?.data?.reference || null;
+        const paymentUrl = checkoutResponse?.data?.payment_url || null;
 
         await db.query(
-            `UPDATE payments SET status = ?, gateway_response = ? WHERE id = ?`,
-            ["processing", JSON.stringify(checkoutResponse), payment.insertId]
+            `UPDATE payments SET status = ?, gateway_response = ?, gateway_transaction_id = ? WHERE id = ?`,
+            ["processing", JSON.stringify(checkoutResponse), snippeRef, payment.insertId]
         );
 
         res.json({
             success: true,
             paymentId: payment.insertId,
             reference: paymentReference,
+            gatewayReference: snippeRef,
             amount: plan.price,
-            currency: plan.currency,
+            currency: plan.currency || "TZS",
             plan: plan.name,
-            azampay: checkoutResponse,
-            message: "Payment initiated successfully."
+            paymentUrl: paymentUrl,
+            snippe: checkoutResponse,
+            message: isCard
+                ? "Redirect customer to payment URL to complete card payment."
+                : "USSD push sent. Ask customer to enter PIN on their phone."
         });
 
     } catch (err) {
         console.log("Payment Error:", err.response?.data || err.message);
-        
+
         let errorMessage = err.message;
         let errorCode = null;
-        
+
         if (err.response?.data) {
             errorMessage = err.response.data.message || err.response.data.error || err.message;
-            errorCode = err.response.data.code || err.response.status;
-        } else if (err.message === 'read ECONNRESET') {
+            errorCode = err.response.data.error_code || err.response.data.code || err.response.status;
+        } else if (err.message === "read ECONNRESET") {
             errorMessage = "Connection to payment gateway failed. Please try again or use a different payment method.";
-        } else if (err.message.includes('404')) {
-            errorMessage = "Payment provider not supported. Please use mobile money (M-Pesa, Airtel Money, or Mix by Yas).";
         }
-        
+
         res.status(err.response?.status || 500).json({
             success: false,
             message: errorMessage,
             code: errorCode,
-            suggestion: paymentMethod === 'bank_card' ? 
-                "Bank card payments may not be supported in sandbox. Try using mobile money." : 
-                "Please check your payment details and try again."
+            suggestion: "Please check your payment details and try again. Ensure phone number is a valid Tanzanian mobile money number."
         });
     }
 };
@@ -516,89 +493,147 @@ exports.getSubscriptionStatus = async (req, res) => {
     }
 };
 
-// ==================== AZAMPAY CALLBACK / WEBHOOK ====================
-exports.azamPayCallback = async (req, res) => {
+// ==================== SNIPPE WEBHOOK ====================
+exports.snippeWebhook = async (req, res) => {
     try {
-        console.log("AzamPay Callback Received:", JSON.stringify(req.body, null, 2));
+        const rawBody = typeof req.body === "string"
+            ? req.body
+            : (req.rawBody || JSON.stringify(req.body));
 
-        const {
-            initiatorReferenceId,
-            fspReferenceId,
-            pgReferenceId,
-            amount,
-            status,
-            message,
-            operator
-        } = req.body;
+        const signature = req.headers["x-webhook-signature"];
+        const timestamp = req.headers["x-webhook-timestamp"];
 
-        // Find payment
-        const [payments] = await db.query(
-            `SELECT * FROM payments WHERE payment_reference = ?`,
-            [initiatorReferenceId]
-        );
+        // Verify signature when secret is configured
+        if (process.env.SNIPPE_WEBHOOK_SECRET) {
+            const valid = snippe.verifyWebhookSignature(
+                rawBody,
+                signature,
+                timestamp,
+                process.env.SNIPPE_WEBHOOK_SECRET
+            );
+            if (!valid) {
+                console.warn("Invalid Snippe webhook signature");
+                return res.status(400).json({ success: false, message: "Invalid signature" });
+            }
+        }
+
+        const body = typeof req.body === "object" ? req.body : JSON.parse(rawBody);
+        console.log("Snippe Webhook Received:", JSON.stringify(body, null, 2));
+
+        // Support both current envelope format and legacy flat format
+        const eventType = body.type || body.event || "";
+        const data = body.data || body;
+
+        const statusRaw = (data.status || "").toLowerCase();
+        const gatewayRef = data.reference || data.id || null;
+        const orderId = data.metadata?.order_id || data.external_reference || null;
+
+        // Find payment by our order_id (payment_reference) or by gateway reference
+        let payments = [];
+        if (orderId) {
+            [payments] = await db.query(
+                `SELECT * FROM payments WHERE payment_reference = ?`,
+                [orderId]
+            );
+        }
+        if (payments.length === 0 && gatewayRef) {
+            [payments] = await db.query(
+                `SELECT * FROM payments WHERE gateway_transaction_id = ? OR payment_reference = ?`,
+                [gatewayRef, gatewayRef]
+            );
+        }
 
         if (payments.length === 0) {
-            console.log("Payment not found for reference:", initiatorReferenceId);
-            return res.status(404).json({
-                success: false,
-                message: "Payment not found"
-            });
+            console.log("Payment not found for webhook:", { orderId, gatewayRef, eventType });
+            // Acknowledge so Snippe does not keep retrying forever for unknown refs
+            return res.json({ success: true, message: "Payment not found (ignored)" });
         }
 
         const payment = payments[0];
 
-        if (payment.status === 'paid') {
-            console.log("Payment already processed:", initiatorReferenceId);
-            return res.json({
-                success: true,
-                message: "Already processed"
-            });
+        if (payment.status === "paid") {
+            console.log("Payment already processed:", payment.payment_reference);
+            return res.json({ success: true, message: "Already processed" });
         }
 
-        let paymentStatus = status.toLowerCase();
-
-        if (paymentStatus === "success" || paymentStatus === "completed") {
+        let paymentStatus = "processing";
+        if (
+            eventType === "payment.completed" ||
+            statusRaw === "completed" ||
+            statusRaw === "success" ||
+            statusRaw === "paid"
+        ) {
             paymentStatus = "paid";
-        } else if (paymentStatus === "failed" || paymentStatus === "error") {
+        } else if (
+            eventType === "payment.failed" ||
+            eventType === "payment.expired" ||
+            eventType === "payment.voided" ||
+            statusRaw === "failed" ||
+            statusRaw === "expired" ||
+            statusRaw === "voided"
+        ) {
             paymentStatus = "failed";
         }
 
         await db.query(
-            `UPDATE payments 
-             SET 
-                gateway_transaction_id = ?,
+            `UPDATE payments
+             SET
+                gateway_transaction_id = COALESCE(?, gateway_transaction_id),
                 status = ?,
                 gateway_response = ?,
                 paid_at = ?
              WHERE id = ?`,
             [
-                pgReferenceId || fspReferenceId || null,
+                gatewayRef,
                 paymentStatus,
-                JSON.stringify(req.body),
-                paymentStatus === 'paid' ? new Date() : null,
+                JSON.stringify(body),
+                paymentStatus === "paid" ? new Date() : null,
                 payment.id
             ]
         );
 
-        if (paymentStatus === 'paid') {
-            await activateUserSubscription(payment.user_id, payment.plan_id);
+        if (paymentStatus === "paid") {
+            // Subscription payment
+            if (payment.plan_id) {
+                await activateUserSubscription(payment.user_id, payment.plan_id);
+            }
+
+            // Movie purchase (plan_id is null, linked via movie_purchases.payment_id)
+            const [purchases] = await db.query(
+                `SELECT id, movie_id FROM movie_purchases WHERE payment_id = ? AND status IN ('pending', 'processing')`,
+                [payment.id]
+            );
+            if (purchases.length > 0) {
+                const expiresAt = new Date();
+                expiresAt.setDate(expiresAt.getDate() + 30); // 30-day access default
+                await db.query(
+                    `UPDATE movie_purchases
+                     SET status = 'completed', expires_at = ?, updated_at = NOW()
+                     WHERE id = ?`,
+                    [expiresAt, purchases[0].id]
+                );
+                console.log(`Movie purchase completed for purchase ${purchases[0].id}`);
+            }
         }
 
-        console.log(`Payment ${paymentStatus} for reference: ${initiatorReferenceId}`);
+        console.log(`Payment ${paymentStatus} for reference: ${payment.payment_reference}`);
 
         res.json({
             success: true,
-            message: "Callback processed successfully"
+            message: "Webhook processed successfully"
         });
 
     } catch (err) {
-        console.error("Callback Error:", err);
+        console.error("Snippe Webhook Error:", err);
         res.status(500).json({
             success: false,
             message: err.message
         });
     }
 };
+
+// Keep legacy alias so old route names do not break if referenced elsewhere
+exports.azamPayCallback = exports.snippeWebhook;
 
 // ==================== ACTIVATE SUBSCRIPTION HELPER ====================
 async function activateUserSubscription(userId, planId) {

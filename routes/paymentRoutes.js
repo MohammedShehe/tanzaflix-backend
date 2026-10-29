@@ -18,8 +18,10 @@ router.get("/subscription/status", authenticate, paymentController.getSubscripti
 // Cancel subscription (end of period)
 router.post("/subscription/cancel", authenticate, paymentController.cancelSubscription);
 
-// ==================== WEBHOOK (NO AUTH - AZAMPAY CALLS THIS) ====================
-router.post("/webhook", paymentController.azamPayCallback);
+// ==================== WEBHOOK (NO AUTH - SNIPPE CALLS THIS) ====================
+router.post("/webhook", paymentController.snippeWebhook);
+// Legacy alias
+router.post("/azampay/webhook", paymentController.snippeWebhook);
 
 // ==================== ADMIN ROUTES ====================
 // Get all payments (admin)
